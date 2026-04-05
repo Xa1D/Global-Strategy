@@ -1,35 +1,32 @@
 import json
 import pygame as pg
-import random
 from shapely.geometry import Point, Polygon
-from player import Player
 
 class Country:
     def __init__(self, name, coords):
         self.name = name
         self.coords = coords 
-        self.font = pg.font.SysFont(None, 24)
         self.polygon = Polygon(self.coords)
         self.center = self.get_center()
         self.color = (128, 128, 128)
         self.hovered = False
         self.highlighted = False
         self.neighbours = None
-        self.has_attacked = False
-        self.controlled_by = self.name
 
     def update(self, mouse_pos):
         self.hovered = False
         if Point(mouse_pos.x, mouse_pos.y).within(self.polygon):
             self.hovered = True
 
-    def draw(self, screen: pg.Surface, scroll, player):
-        if self in player.territories:
+    def draw(self, screen, scroll, player,enemy):
+        if self.highlighted:
+            colour = (255, 150, 0)
+        elif self in player.territories:
           colour = (0, 100, 255) 
-        elif self.hovered:
+        elif self in enemy.territories:
+            colour = ("green")
+        elif self.hovered and not self.highlighted:
           colour = (255, 0, 0) 
-        elif self.highlighted:
-            colour = (255, 150, 0)  
         else:
           colour = self.color     
 
@@ -45,6 +42,7 @@ class Country:
 class World:
     MAP_WIDTH = 2.05 * 4000
     MAP_HEIGHT = 1.0 * 4000
+
     def __init__(self):
         self.read_geo_data()
         self.countries = self.create_countries()
@@ -72,9 +70,9 @@ class World:
             countries[name] = Country(name, xy_coords)
         return countries
 
-    def draw(self, screen, player):
+    def draw(self, screen, player, enemy):
      for country in self.countries.values():
-        country.draw(screen, self.scroll, player)
+        country.draw(screen, self.scroll, player,enemy)
 
     def update(self):
         self.update_camera()
@@ -99,8 +97,8 @@ class World:
             self.scroll = pg.Vector2(3650, 395)
         
     def create_neighbours(self):
-        for k, v in self.countries.items():
-            v.neighbours = self.get_country_neighbours(k)
+        for name, country in self.countries.items():
+            country.neighbours = self.get_country_neighbours(name)
 
     def get_units(self):
       starting_units = {"United Kingdom": 20,"Ukraine": 12,"Switzerland": 8,"Sweden": 7,"Spain": 15,"Slovakia": 5,"Slovenia": 5,

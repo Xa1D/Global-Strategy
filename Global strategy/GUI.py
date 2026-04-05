@@ -1,6 +1,4 @@
 import pygame
-import sys
-import pygame
 
 class Button():
     def __init__(self, text, pos, font, base_color, hover_color,callback=None, base_bg=(50,50,50), hover_bg=(0,100,200),padding=(10,5), image=None):
@@ -69,13 +67,27 @@ class Sidebar:
 
     def draw(self, screen, country):
         if country is None:
-            return
-        pygame.draw.rect(screen, self.bg_color, (*self.pos, self.width, self.height))
-        name_text = self.font.render(country.name, True, (255,255,255))
-        units_text = self.font.render(f"Units: {country.units}", True, (255,255,255))
-        screen.blit(name_text, (self.pos[0]+self.padding, self.pos[1]+self.padding))
-        screen.blit(units_text, (self.pos[0]+self.padding, self.pos[1]+40))
-        mouse_pos = pygame.mouse.get_pos()
-        for button in self.buttons:
-            button.changeColor(mouse_pos)
-            button.update(screen)
+             pygame.draw.rect(screen, self.bg_color, (*self.pos, self.width, self.height))
+             name_text = self.font.render("Stats", True, (255,255,255))
+             screen.blit(name_text, (self.pos[0]+self.padding, self.pos[1]+self.padding))
+             mouse_pos = pygame.mouse.get_pos()
+             for button in self.buttons:
+                button.changeColor(mouse_pos)
+                button.update(screen)
+        else:
+            pygame.draw.rect(screen, self.bg_color, (*self.pos, self.width, self.height))
+            name_text = self.font.render(country.name, True, (255,255,255))
+            units_text = self.font.render(f"Units: {country.units}", True, (255,255,255))
+            screen.blit(name_text, (self.pos[0]+self.padding, self.pos[1]+self.padding))
+            screen.blit(units_text, (self.pos[0]+self.padding, self.pos[1]+40))
+            mouse_pos = pygame.mouse.get_pos()
+            for button in self.buttons:
+                button.changeColor(mouse_pos)
+                button.update(screen)
+    
+class Camera:
+    def __init__(self):
+        self.offset = pygame.Vector2(0, 0)
+        self.dragging = False
+        self.last_mouse_pos = None
+        
