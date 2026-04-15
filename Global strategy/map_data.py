@@ -1,20 +1,23 @@
-import geopandas as gpd
-from shapely.geometry import mapping
-import numpy as np
+import geopandas
 import json
 
-geo_data = gpd.read_file("./ne_50m_admin_0_countries/ne_50m_admin_0_countries.shp")
-remove_list = ['Vatican','Jersey', 'Guernsey', 'Isle of Man','San Marino','Monaco','Russia','Liechtenstein','Aland','Faroe Islands','Andorra','Malta']
-country_coords = {}
-for index, country in geo_data[(geo_data.CONTINENT == "Europe") & (~geo_data.ADMIN.isin(remove_list))].iterrows():
-    geojson_obj = mapping(country["geometry"].simplify(0.08))
-    geo_coords = geojson_obj["coordinates"]
-    main_index = np.argmax([len(coords[0]) for coords in geo_coords])
-    country_coords[country["ADMIN"]] = geo_coords[main_index]
+geo_data = geopandas.read_file("./ne_50m_admin_0_countries/ne_50m_admin_0_countries.shp")
+remove = ['Vatican', 'Jersey', 'Guernsey', 'Isle of Man', 'San Marino','Monaco', 'Russia', 'Liechtenstein', 'Aland','Faroe Islands', 'Andorra', 'Malta']
 countries = {}
-for country_name, country_coord in country_coords.items():
-    while len(country_coord) < 5:
-        country_coord = country_coord[0]
-    countries[country_name] = country_coord
-with open('country_coords.json', 'w') as f:
-    json.dump(countries, f)
+for index, row in geo_data.iterrows():
+    if row["CONTINENT"] == "Europe" and row["ADMIN"] not in remove:
+        name = row["ADMIN"]
+        shape = row["geometry"].simplify(0.08)
+        if shape.geom_type == "MultiPolygon":
+            parts = list(shape.geoms)
+        else:
+            parts = [shape]
+        largest = parts[0]
+        for part in parts:
+            if len(part.exterior.coords) > len(largest.exterior.coords):
+                largest = part
+        coords = list(largest.exterior.coords)
+        countries[name] = coords
+with open("country_coords.py", "w") as file:
+    file.write("countries = ")
+    file.write(str(countries))

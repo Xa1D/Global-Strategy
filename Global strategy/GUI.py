@@ -1,7 +1,7 @@
 import pygame
 
 class Button():
-    def __init__(self, text, pos, font, base_color, hover_color,callback=None, base_bg=(50,50,50), hover_bg=(0,100,200),padding=(10,5), image=None):
+    def __init__(self, text, position, font, base_color, hover_color,callback=None, base_bg=(50,50,50), hover_bg=(0,100,200),padding=(10,5), image=None):
         self.font = font
         self.text_input = text
         self.base_color = base_color
@@ -22,7 +22,7 @@ class Button():
             self.image = pygame.Surface((width, height))
             self.image.fill(self.base_bg)
             self.using_image = False
-        self.rect = self.image.get_rect(center=pos)
+        self.rect = self.image.get_rect(center=position)
         self.text_rect = self.text.get_rect(center=self.rect.center)
 
     def update(self, screen):
@@ -30,7 +30,7 @@ class Button():
         screen.blit(self.image, self.rect)
         screen.blit(self.text, self.text_rect)
 
-    def changeColor(self, mouse_pos):
+    def hover_colour(self, mouse_pos):
         if self.rect.collidepoint(mouse_pos):
             self.text = self.text_hover
             if not self.using_image: 
@@ -57,37 +57,27 @@ class Sidebar:
         self.buttons = []
 
     def add_button(self, text, callback):
-        button_pos = (self.pos[0] + self.width // 2, self.pos[1] + 100 + len(self.buttons) * self.button_spacing)
-        button = Button(text=text, pos=button_pos, font=self.font, base_color=(255,255,255), hover_color=(255,255,0), callback=callback)
+        pos_y = self.pos[1] + 100 
+        pos_y += len(self.buttons) * self.button_spacing
+        button_pos = (self.pos[0] + self.width // 2, pos_y)
+        button = Button(text=text, position=button_pos, font=self.font, base_color=(255,255,255), hover_color=(255,255,0), callback=callback)
         self.buttons.append(button)
 
     def handle_event(self, event):
-        for btn in self.buttons:
-            btn.handle_event(event)
+        for i in self.buttons:
+            i.handle_event(event)
 
     def draw(self, screen, country):
+        pygame.draw.rect(screen, self.bg_color, (self.pos[0], self.pos[1], self.width, self.height))
         if country is None:
-             pygame.draw.rect(screen, self.bg_color, (*self.pos, self.width, self.height))
              name_text = self.font.render("Stats", True, (255,255,255))
              screen.blit(name_text, (self.pos[0]+self.padding, self.pos[1]+self.padding))
-             mouse_pos = pygame.mouse.get_pos()
-             for button in self.buttons:
-                button.changeColor(mouse_pos)
-                button.update(screen)
         else:
-            pygame.draw.rect(screen, self.bg_color, (*self.pos, self.width, self.height))
             name_text = self.font.render(country.name, True, (255,255,255))
             units_text = self.font.render(f"Units: {country.units}", True, (255,255,255))
             screen.blit(name_text, (self.pos[0]+self.padding, self.pos[1]+self.padding))
             screen.blit(units_text, (self.pos[0]+self.padding, self.pos[1]+40))
-            mouse_pos = pygame.mouse.get_pos()
-            for button in self.buttons:
-                button.changeColor(mouse_pos)
-                button.update(screen)
-    
-class Camera:
-    def __init__(self):
-        self.offset = pygame.Vector2(0, 0)
-        self.dragging = False
-        self.last_mouse_pos = None
-        
+        mouse_pos = pygame.mouse.get_pos()
+        for button in self.buttons:
+            button.hover_colour(mouse_pos)
+            button.update(screen)
