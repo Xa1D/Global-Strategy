@@ -1,17 +1,17 @@
 import pygame
 
 class Button():
-    def __init__(self, text, position, font, base_color, hover_color,callback=None, base_bg=(50,50,50), hover_bg=(0,100,200),padding=(10,5), image=None):
+    def __init__(self, text, position, font, base_colour, hover_colour,callback=None, base_bg=(50,50,50), hover_bg=(0,100,200),padding=(10,5), image=None):
         self.font = font
         self.text_input = text
-        self.base_color = base_color
-        self.hover_color = hover_color
+        self.base_colour = base_colour
+        self.hover_colour = hover_colour
         self.callback = callback
         self.base_bg = base_bg
         self.hover_bg = hover_bg
         self.padding = padding
-        self.text_base = self.font.render(self.text_input, True, self.base_color)
-        self.text_hover = self.font.render(self.text_input, True, self.hover_color)
+        self.text_base = self.font.render(self.text_input, True, self.base_colour)
+        self.text_hover = self.font.render(self.text_input, True, self.hover_colour)
         self.text = self.text_base
         width = self.text.get_width() + 2*self.padding[0]
         height = self.text.get_height() + 2*self.padding[1]
@@ -30,7 +30,7 @@ class Button():
         screen.blit(self.image, self.rect)
         screen.blit(self.text, self.text_rect)
 
-    def hover_colour(self, mouse_pos):
+    def change_hover_colour(self, mouse_pos):
         if self.rect.collidepoint(mouse_pos):
             self.text = self.text_hover
             if not self.using_image: 
@@ -46,12 +46,12 @@ class Button():
                 self.callback()
 
 class Sidebar:
-    def __init__(self, pos, width, height, font, bg_color=(30,30,30), padding=10, button_spacing=60):
+    def __init__(self, pos, width, height, font, bg_colour=(30,30,30), padding=10, button_spacing=60):
         self.pos = pos
         self.width = width
         self.height = height
         self.font = font
-        self.bg_color = bg_color
+        self.bg_colour = bg_colour
         self.padding = padding
         self.button_spacing = button_spacing
         self.buttons = []
@@ -60,7 +60,7 @@ class Sidebar:
         pos_y = self.pos[1] + 100 
         pos_y += len(self.buttons) * self.button_spacing
         button_pos = (self.pos[0] + self.width // 2, pos_y)
-        button = Button(text=text, position=button_pos, font=self.font, base_color=(255,255,255), hover_color=(255,255,0), callback=callback)
+        button = Button(text=text, position=button_pos, font=self.font, base_colour=(255,255,255), hover_colour=(255,255,0), callback=callback)
         self.buttons.append(button)
 
     def handle_event(self, event):
@@ -68,7 +68,7 @@ class Sidebar:
             i.handle_event(event)
 
     def draw(self, screen, country):
-        pygame.draw.rect(screen, self.bg_color, (self.pos[0], self.pos[1], self.width, self.height))
+        pygame.draw.rect(screen, self.bg_colour, (self.pos[0], self.pos[1], self.width, self.height))
         if country is None:
              name_text = self.font.render("Stats", True, (255,255,255))
              screen.blit(name_text, (self.pos[0]+self.padding, self.pos[1]+self.padding))
@@ -79,5 +79,5 @@ class Sidebar:
             screen.blit(units_text, (self.pos[0]+self.padding, self.pos[1]+40))
         mouse_pos = pygame.mouse.get_pos()
         for button in self.buttons:
-            button.hover_colour(mouse_pos)
+            button.change_hover_colour(mouse_pos)
             button.update(screen)

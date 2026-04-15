@@ -22,7 +22,7 @@ def draw_menu():
     text = font.render("MAIN MENU", True, "white")
     screen.blit(text, text.get_rect(center=(640, 100)))
     for button in [PLAY_BUTTON, QUIT_BUTTON]:
-        button.hover_colour(mouse_pos)
+        button.change_hover_colour(mouse_pos)
         button.update(screen)
 
 def draw_pause():
@@ -31,7 +31,7 @@ def draw_pause():
     text = font.render("PAUSED", True, "white")
     screen.blit(text, text.get_rect(center=(640, 150)))
     for button in [CONTINUE_BUTTON, NEW_GAME_BUTTON, MENU_QUIT_BUTTON]:
-        button.hover_colour(mouse_pos)
+        button.change_hover_colour(mouse_pos)
         button.update(screen)
 
 def main():
