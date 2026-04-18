@@ -11,10 +11,8 @@ class Game:
         self.window_size = pygame.Vector2(width, height)
         self.font = pygame.font.SysFont(None, 35)
         self.world = Map()
-        self.player_country = None
-        self.enemy_country = None
-        self.player = None
-        self.enemy = None
+        self.player_country, self.enemy_country = None, None
+        self.player, self.enemy = None, None
         self.attack_start_time = 0
         self.attack_duration = 4000
         self.incoming_attack = None
@@ -22,8 +20,7 @@ class Game:
         self.result_start_time = 0
         self.result_duration = 2000
         self.move_from = None 
-        self.selected_country = None
-        self.attacking_country = None
+        self.selected_country, self.attacking_country = None, None
         self.last_income_time = pygame.time.get_ticks()
         self.sidebar = Sidebar(pos=(1000, 0), width=280, height=720, font=self.font)
         self.player_sidebar = Sidebar(pos=(0,40), width=250, height=640, font=self.font)
@@ -54,12 +51,10 @@ class Game:
         self.world.draw(self.screen, None, None)
         if self.setup_mode == "player":
              text = self.font.render("Choose your starting country", True, (255, 255, 255))
-             rect = text.get_rect(center=(640, 100))
-             self.screen.blit(text, rect)
         elif self.setup_mode == "enemy":
             text = self.font.render("Choose an enemy country", True, (255, 255, 255))
-            rect = text.get_rect(center=(640, 100))
-            self.screen.blit(text, rect)
+        rect = text.get_rect(center=(640, 100))
+        self.screen.blit(text, rect)
 
     def buy_units_country(self):
         if self.selected_country:
@@ -70,8 +65,8 @@ class Game:
         if self.selected_country:
             if self.selected_country in self.player.territories:
                 self.sidebar.add_button("Buy Units", self.buy_units_country)
-                self.sidebar.add_button("Attack", self.enter_attack_mode)
-                self.sidebar.add_button("Move Units", self.enter_move_mode)
+                self.sidebar.add_button("Attack", self.enter_attack)
+                self.sidebar.add_button("Move Units", self.enter_move)
    
     def check_win(self):
         if len(self.player.territories) == len(self.world.countries):
@@ -83,14 +78,14 @@ class Game:
             self.game_result = "lose"
             self.end_time = pygame.time.get_ticks()
 
-    def enter_attack_mode(self):
+    def enter_attack(self):
         if self.selected_country in self.player.territories:
             self.state = "select_attack"
             self.attacking_country = self.selected_country
             self.highlight()
             self.update_sidebar()
 
-    def enter_move_mode(self):
+    def enter_move(self):
         if self.selected_country in self.player.territories:
             self.state = "moving"
             self.move_from = self.selected_country
@@ -160,13 +155,11 @@ class Game:
                     if current_time < clicked_country.attack_cooldown:
                       return
                     else: 
-                        self.player.attacking_country = self.attacking_country
-                        self.player.defending_country = clicked_country
+                        self.player.attacking_country, self.player.defending_country = self.attacking_country, clicked_country
                         self.state = "attacking"
                         self.attack_start_time = pygame.time.get_ticks()
                         self.incoming_attack = (self.attacking_country, clicked_country)
-                        self.attacking_country.combat = True
-                        clicked_country.combat = True
+                        self.attacking_country.combat, clicked_country.combat = True, True
                         self.attack_result = None
                         self.remove_highlight()
                         self.attacking_country = None
@@ -174,18 +167,19 @@ class Game:
 
     def select_country(self, clicked_country):
         self.selected_country = clicked_country 
-        if clicked_country in self.player.territories:
-            self.attacking_country = clicked_country
         self.remove_highlight()
         self.update_sidebar()
     
+    def deselect_country(self):
+        self.selected_country = None
+        self.attacking_country = None
+        self.remove_highlight()
+        self.update_sidebar()
+        self.state = "play"
+    
     def handle_country_click(self, clicked_country):
         if self.selected_country == clicked_country:
-            self.selected_country = None
-            self.attacking_country = None
-            self.remove_highlight()
-            self.update_sidebar()
-            self.state = "play"
+            self.deselect_country()
             return
         if self.state == "moving":
             self.handle_move(clicked_country)
@@ -198,11 +192,13 @@ class Game:
     def update(self):
         if self.state == "setup":
             return
-        self.world.update()
-        self.update_player_sidebar()
-        self.enemy.update_ai(self.world, self.player)
-        self.player.update()
-        self.enemy.update()
+        if self.state != "game_over":
+            self.world.update()
+            self.update_player_sidebar()
+            self.enemy.update_ai(self.world, self.player)
+            self.player.update()
+            self.enemy.update()
+            self.check_win()
         current_time = pygame.time.get_ticks()
         if self.state == "attacking":
             if current_time - self.attack_start_time >= self.attack_duration:
@@ -222,11 +218,6 @@ class Game:
         elif self.attack_result:
             if current_time - self.result_start_time >= self.result_duration:
                 self.attack_result = None
-                self.attack_attacker = None
-                self.attack_defender = None
-
-        if self.state != "game_over":
-            self.check_win()
 
     def update_player_sidebar(self):
         if self.player is None:

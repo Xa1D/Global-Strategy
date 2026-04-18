@@ -7,8 +7,7 @@ class Country:
         self.name = name
         self.coords = coords 
         self.polygon = Polygon(self.coords)
-        self.center = self.get_center()
-        self.color = (128, 128, 128)
+        self.colour = (128,128,128)
         self.hovered = False
         self.highlighted = False
         self.attack_cooldown = 0
@@ -29,18 +28,11 @@ class Country:
         elif self.hovered and not self.highlighted:
           colour = (255, 0, 0) 
         else:
-          colour = self.color     
+          colour = self.colour     
         pygame.draw.polygon(screen,colour,[(x - scroll.x, y - scroll.y) for x, y in self.coords],)
         pygame.draw.polygon(screen,(255, 255, 255),[(x - scroll.x, y - scroll.y) for x, y in self.coords],width=1,)
-       
-    def get_center(self):
-      x = sum([x for x, y in self.coords]) / len(self.coords)
-      y = sum([y for x, y in self.coords]) / len(self.coords)
-      return pygame.Vector2(x, y)
-
 
 class Map:
-
     def __init__(self):
         self.width = 8000
         self.height = 4000
@@ -86,15 +78,13 @@ class Map:
             self.scroll.y -= 10
         if keys[pygame.K_s]:
             self.scroll.y += 10
-        if keys[pygame.K_SPACE]:
-            self.scroll = pygame.Vector2(3650, 395)
         
     def create_neighbours(self):
         for name, country in self.countries.items():
             country.neighbours = self.get_country_neighbours(name)
 
     def get_units(self):
-      starting_units = {"United Kingdom": 20,"Ukraine": 12,"Switzerland": 8,"Sweden": 7,"Spain": 15,"Slovakia": 5,"Slovenia": 5,
+      starting_units = {"United Kingdom": 20,"Ukraine": 12,"Switzerland": 8,"Sweden": 9,"Spain": 15,"Slovakia": 5,"Slovenia": 5,
 "Republic of Serbia": 5,"Romania": 5,"Portugal": 5,"Poland": 15,"Norway": 10,"Netherlands": 12,"Montenegro": 5,"Moldova": 5,"North Macedonia": 5,
 "Luxembourg": 5,"Lithuania": 5,"Latvia": 5,"Kosovo": 15,"Italy": 20,"Ireland": 10,"Iceland": 10,"Hungary": 10,
 "Greece": 10,"Germany": 20,"France": 20,"Finland": 10,"Estonia": 8,"Denmark": 10,"Czechia": 7,"Croatia": 10,"Bulgaria": 10,"Bosnia and Herzegovina": 6,

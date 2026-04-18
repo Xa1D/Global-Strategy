@@ -1,12 +1,12 @@
 import pygame
 
 class Button():
-    def __init__(self, text, position, font, base_colour, hover_colour,callback=None, base_bg=(50,50,50), hover_bg=(0,100,200),padding=(10,5), image=None):
+    def __init__(self, text, position, font, base_colour, hover_colour,func=None, base_bg=(50,50,50), hover_bg=(0,100,200),padding=(10,10), image=None):
         self.font = font
         self.text_input = text
         self.base_colour = base_colour
         self.hover_colour = hover_colour
-        self.callback = callback
+        self.function = func
         self.base_bg = base_bg
         self.hover_bg = hover_bg
         self.padding = padding
@@ -42,8 +42,8 @@ class Button():
 
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN and self.rect.collidepoint(event.pos):
-            if self.callback:
-                self.callback()
+            if self.function:
+                self.function()
 
 class Sidebar:
     def __init__(self, pos, width, height, font, bg_colour=(30,30,30), padding=10, button_spacing=60):
@@ -56,11 +56,11 @@ class Sidebar:
         self.button_spacing = button_spacing
         self.buttons = []
 
-    def add_button(self, text, callback):
+    def add_button(self, text, func):
         pos_y = self.pos[1] + 100 
         pos_y += len(self.buttons) * self.button_spacing
         button_pos = (self.pos[0] + self.width // 2, pos_y)
-        button = Button(text=text, position=button_pos, font=self.font, base_colour=(255,255,255), hover_colour=(255,255,0), callback=callback)
+        button = Button(text=text, position=button_pos, font=self.font, base_colour=(255,255,255), hover_colour=(255,255,0), func=func)
         self.buttons.append(button)
 
     def handle_event(self, event):

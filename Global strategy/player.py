@@ -1,5 +1,6 @@
 import random
 import pygame
+from collections import deque
 
 class Player:
     def __init__(self, country):
@@ -30,12 +31,10 @@ class Player:
             return "win"
         else:
             attacker_loss = attacker_units // 2
-            defender_loss = defender_units // 3
+            defender_loss = defender_units // 4
             self.attacking_country.units = max(1, attacker_units - attacker_loss)
             self.defending_country.units = max(1, defender_units - defender_loss)
             return "lose"
-        
-
 
     def buy_units(self, country, amount=10):
         if country in self.territories:
@@ -54,17 +53,16 @@ class Player:
             self.currency += self.income
             self.last_income_time = current_time
 
-
-    def move_units(self, from_country, to_country, amount):
-        if from_country not in self.territories or to_country not in self.territories:
+    def move_units(self, original_country, selected_country, amount):
+        if original_country not in self.territories or selected_country not in self.territories:
             return False
-        if to_country.name not in from_country.neighbours:
+        if selected_country.name not in original_country.neighbours:
             return False
-        amount = min(amount, from_country.units - 1)
+        amount = min(amount, original_country.units - 1)
         if amount <= 0:
             return False
-        from_country.units -= amount
-        to_country.units += amount
+        original_country.units -= amount
+        selected_country.units += amount
         return True
 
 class AI(Player):
@@ -72,30 +70,71 @@ class AI(Player):
         super().__init__(country)
         self.playstyle = playstyle
         self.delay = 4000
+        self.targets = ["United Kingdom", "Germany", "France", "Sweden"]
+        self.target_country = None
         self.attack_duration = 2000
         self.last_attack = 0
         self.state = "idle"
         self.last_action = pygame.time.get_ticks()
-    
+
+    def bfs_path(start_country, target_country, world):
+        queue = deque([start_country])
+        visited = set([start_country])
+        parent = {}
+        while queue:
+            current = queue.popleft()
+            if current == target_country:
+                break
+            for neighbour_name in current.neighbours:
+                neighbour = world.countries[neighbour_name]
+                if neighbour not in visited:
+                    visited.add(neighbour)
+                    parent[neighbour] = current
+                    queue.append(neighbour)
+        if target_country != start_country and target_country not in parent:
+            return None
+        path = []
+        current = target_country
+        while current != start_country:
+            path.append(current)
+            current = parent[current]
+        path.append(start_country)
+        path.reverse()
+        return path
+
     def update_ai(self, world, enemy):
         current_time = pygame.time.get_ticks()
         if self.state == "attacking":
             if current_time - self.last_attack >= self.attack_duration:
                 self.attack(enemy)
                 self.state = "idle"
-                self.attacking_country.combat = False
-                self.defending_country.combat = False
+                self.attacking_country.combat, self.defending_country.combat = False, False
                 self.last_action = current_time 
             return
         if current_time - self.last_action >= self.delay:
-            self.plan_attack(world)
             self.send_units(world)
             self.purchase_units()
+            self.plan_attack(world)
             self.last_action = current_time
+
+    def simulate_paths(self,world):
+        best_path = None
+        start = None
+        for target in self.targets:
+            if target in self.territories:
+                self.targets.remove(target)
+        for country in self.territories:
+          for target in self.targets:
+              path = self.bfs_path(country,target,world)
+              if path:
+                if best_path == None or len(path) < len(best_path):
+                    path = best_path
+                    start = country
 
     def plan_attack(self, world):
         best_attack = None
         best_score = -1
+        prob = random.random()
         for country in self.territories:
             for name in country.neighbours:
                 neighbour = world.countries[name]
@@ -113,13 +152,11 @@ class AI(Player):
                                 if score > best_score:
                                     best_score = score
                                     best_attack = (country, neighbour)
-        if best_attack:
+        if best_attack and prob >= 0.15:
             attacker, defender = best_attack
-            self.attacking_country = attacker
-            self.defending_country = defender
+            self.attacking_country, self.defending_country = attacker, defender
             self.state = "attacking"
-            self.attacking_country.combat = True
-            self.defending_country.combat = True
+            self.attacking_country.combat, self.defending_country.combat = True, True
             self.last_attack = pygame.time.get_ticks()
 
     def send_units(self, world):

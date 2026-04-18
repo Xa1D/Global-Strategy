@@ -1,5 +1,4 @@
 import geopandas
-import json
 
 geo_data = geopandas.read_file("./ne_50m_admin_0_countries/ne_50m_admin_0_countries.shp")
 remove = ['Vatican', 'Jersey', 'Guernsey', 'Isle of Man', 'San Marino','Monaco', 'Russia', 'Liechtenstein', 'Aland','Faroe Islands', 'Andorra', 'Malta']
