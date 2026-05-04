@@ -11,6 +11,7 @@ class Game:
         self.font = pygame.font.SysFont(None, 35)
        
         self.UI = UI()
+
         self.world = Map()
         self.player_country, self.enemy_country = None, None
         self.player, self.enemy = None, None
@@ -25,15 +26,28 @@ class Game:
         self.selected_country, self.attacking_country = None, None
         self.last_income_time = pygame.time.get_ticks()
 
-        self.UI.update_sidebar(self.selected_country, self.player, self.buy_units_country, self.enter_attack, self.enter_move)
+        self.UI.update_sidebar(self.selected_country, self.player, self.update_unit_panel, self.enter_attack, self.enter_move)
 
         self.game_result = None
         self.state = "setup"
 
-    def buy_units_country(self):
+    def buy_infantry_country(self):
         if self.selected_country:
-            self.player.buy_units(self.selected_country)
-    
+            self.player.buy_infantry(self.selected_country)
+
+    def buy_tank_country(self):
+        if self.selected_country:
+            self.player.buy_tank(self.selected_country)
+
+    def buy_artillery_country(self):
+        if self.selected_country:
+            self.player.buy_artillery(self.selected_country)
+
+    def update_unit_panel(self):
+        self.UI.panel_visible = True
+        self.UI.open_units_info(self.buy_infantry_country, self.buy_tank_country, self.buy_artillery_country)
+        self.UI.update_sidebar(self.selected_country, self.player, self.update_unit_panel, self.enter_attack, self.enter_move)
+
 #game ends when player captures all territories or loses all territories
     def check_win(self):
         if len(self.player.territories) == len(self.world.countries):
@@ -50,14 +64,18 @@ class Game:
         if self.selected_country in self.player.territories:
             self.state = "select_attack"
             self.attacking_country = self.selected_country
+            self.UI.panel_visible = True
+            self.UI.open_attack_info()
             self.UI.highlight_attack(self.attacking_country, self.world, self.player)
-            self.UI.update_sidebar(self.selected_country, self.player, self.buy_units_country, self.enter_attack, self.enter_move)
+            self.UI.update_sidebar(self.selected_country, self.player, self.update_unit_panel, self.enter_attack, self.enter_move)
 
 #enters move mode when move units button clicked
     def enter_move(self):
         if self.selected_country in self.player.territories:
             self.state = "moving"
             self.move_from = self.selected_country
+            self.UI.panel_visible = True
+            self.UI.open_move_info()
             self.UI.highlight_move(self.move_from, self.world, self.player)
 
 #handles events based on state of the game
@@ -75,6 +93,8 @@ class Game:
                     return "pause"
             if self.state == "attacking":
                 return
+            if self.UI.panel_visible:
+                self.UI.panel.handle_event(event)
             self.UI.sidebar.handle_event(event)
             world_pos = self.world.get_world_pos()
             point = Point(world_pos.x,world_pos.y)
@@ -109,7 +129,7 @@ class Game:
         if self.move_from:
             if clicked_country in self.player.territories:
                 if clicked_country.name in self.move_from.adjacent:
-                    amount = self.move_from.units // 2 
+                    amount = self.move_from.units["infantry"] // 2 
                     success = self.player.move_units(self.move_from, clicked_country, amount)
                     if success:
                         self.move_text = f"Moved {amount} units from {self.move_from.name} to {clicked_country.name}"
@@ -117,7 +137,7 @@ class Game:
             self.move_from = None
             self.state = "play"
             self.UI.remove_highlight(self.world)
-            self.UI.update_sidebar(self.selected_country, self.player, self.buy_units_country, self.enter_attack, self.enter_move)
+            self.UI.update_sidebar(self.selected_country, self.player, self.update_unit_panel, self.enter_attack, self.enter_move)
 
 #changes state to attacking and creates an incoming attack
     def handle_attack(self, clicked_country):
@@ -136,18 +156,19 @@ class Game:
                         self.attack_result = None
                         self.UI.remove_highlight(self.world)
                         self.attacking_country = None
-                        self.UI.update_sidebar(self.selected_country, self.player, self.buy_units_country, self.enter_attack, self.enter_move)
+                        self.UI.update_sidebar(self.selected_country, self.player, self.update_unit_panel, self.enter_attack, self.enter_move)
 
     def select_country(self, clicked_country):
         self.selected_country = clicked_country 
         self.UI.remove_highlight(self.world)
-        self.UI.update_sidebar(self.selected_country, self.player, self.buy_units_country, self.enter_attack, self.enter_move)
+        self.UI.update_sidebar(self.selected_country, self.player, self.update_unit_panel, self.enter_attack, self.enter_move)
     
     def deselect_country(self):
         self.selected_country = None
         self.attacking_country = None
+        self.UI.units_sidebar_visible = False
         self.UI.remove_highlight(self.world)
-        self.UI.update_sidebar(self.selected_country, self.player, self.buy_units_country, self.enter_attack, self.enter_move)
+        self.UI.update_sidebar(self.selected_country, self.player, self.update_unit_panel, self.enter_attack, self.enter_move)
         self.state = "play"
 
 #handles player clicking countries on map  
@@ -188,7 +209,7 @@ class Game:
                 self.result_start_time = current_time
                 self.UI.remove_highlight(self.world)
                 self.attacking_country = None
-                self.UI.update_sidebar(self.selected_country, self.player, self.buy_units_country, self.enter_attack, self.enter_move)
+                self.UI.update_sidebar(self.selected_country, self.player, self.update_unit_panel, self.enter_attack, self.enter_move)
         elif self.attack_result:
             if current_time - self.result_start_time >= self.result_duration:
                 self.attack_result = None

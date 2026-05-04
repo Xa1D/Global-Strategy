@@ -1,5 +1,6 @@
 import random
 import pygame
+from combat import Combat
 
 class Player:
     def __init__(self, country):
@@ -15,6 +16,14 @@ class Player:
     def attack(self, enemy):
         if self.attacking_country is None or self.defending_country is None:
             return None
+        battle = Combat(self.attacking_country, self.defending_country)
+        result = battle.simulate_combat()
+        if result == "attacker":
+             if self.defending_country in enemy.territories:
+                enemy.territories.remove(self.defending_country)
+             self.territories.append(self.defending_country)
+        else:
+            pass
         attacker_units = self.attacking_country.units
         defender_units = self.defending_country.units
         probability = (attacker_units ** 1.5) / (attacker_units ** 1.5 + defender_units ** 1.5)
@@ -38,13 +47,27 @@ class Player:
             self.defending_country.units = max(1, defender_units - defender_loss)
             return "lose"
 
-    def buy_units(self, country, amount=10):
+    def buy_infantry(self, country,amount=1):
         if country in self.territories:
-            cost = 10
+            cost = 5
             if self.currency >= cost:
                 self.currency -= cost
-                country.units += amount
-    
+                country.units["infantry"] = country.units.get("infantry", 0) + amount
+
+    def buy_tank(self, country, amount=1):
+        if country in self.territories:
+            cost = 15
+            if self.currency >= cost:
+                self.currency -= cost
+                country.units["tank"] = country.units.get("tank", 0) + amount
+
+    def buy_artillery(self, country, amount=1):
+        if country in self.territories:
+            cost = 20
+            if self.currency >= cost:
+                self.currency -= cost
+                country.units["artillery"] = country.units.get("artillery", 0) + amount
+
     def update(self):
         self.update_income()
         
@@ -62,18 +85,18 @@ class Player:
             return False
         if selected_country.name not in original_country.adjacent:
             return False
-        amount = min(amount, original_country.units - 1)
+        amount = min(amount, original_country.units["infantry"] - 1)
         if amount <= 0:
             return False
-        original_country.units -= amount
-        selected_country.units += amount
+        original_country.units["infantry"] -= amount
+        selected_country.units["infantry"] += amount
         return True
 
 class AI(Player):
     def __init__(self, country, playstyle):
         super().__init__(country)
         self.playstyle = playstyle
-        self.delay = 5000
+        self.delay = 50000000
         self.targets = ["United Kingdom", "Germany", "France", "Sweden"]
         self.target_country = None
         self.attack_duration = 2000
@@ -86,7 +109,7 @@ class AI(Player):
 #creates a path from the original country to target country using the previous countries dictionary
     def search(self,start, target, world):
         queue = [start]
-        visited = [start]
+        visited = set([start])
         previous = {}
         path = []
         while len(queue) > 0:
@@ -97,7 +120,7 @@ class AI(Player):
                 for name in current.adjacent:
                     neighbour = world.countries[name]
                     if neighbour not in visited:
-                        visited.append(neighbour)
+                        visited.add(neighbour)
                         previous[neighbour] = current
                         queue.append(neighbour)
         current = target

@@ -2,7 +2,6 @@ import pygame
 from country_coords import countries
 from GUI import Camera
 from country import Country
-from combat import Unit
 
 class Map:
     def __init__(self):

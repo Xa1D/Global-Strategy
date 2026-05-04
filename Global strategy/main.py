@@ -29,6 +29,7 @@ def main():
                 if result == "pause":
                     state = "paused"
                 if result == "menu":
+                    game = None
                     state = "menu"
             elif state == "paused":
                 result = ui.handle_pause_event(event)
@@ -46,8 +47,8 @@ def main():
             game.draw()
         elif state == "paused":
             ui.draw_pause(screen)
-        pygame.display.update()
         clock.tick(60)
+        pygame.display.update()
 
 if __name__ == "__main__":
     main()
