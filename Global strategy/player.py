@@ -1,6 +1,7 @@
 import random
 import pygame
-from combat import Combat
+from combat import Combat, STATS
+from country import Country
 
 class Player:
     def __init__(self, country):
@@ -16,57 +17,27 @@ class Player:
     def attack(self, enemy):
         if self.attacking_country is None or self.defending_country is None:
             return None
-        battle = Combat(self.attacking_country, self.defending_country)
-        result = battle.simulate_combat()
-        if result == "attacker":
-             if self.defending_country in enemy.territories:
-                enemy.territories.remove(self.defending_country)
-             self.territories.append(self.defending_country)
-        else:
-            pass
-        attacker_units = self.attacking_country.units
-        defender_units = self.defending_country.units
-        probability = (attacker_units ** 1.5) / (attacker_units ** 1.5 + defender_units ** 1.5)
         cooldown_time = 5000
         current_time = pygame.time.get_ticks()
-        if random.random() < probability:
+        battle = Combat(self.attacking_country, self.defending_country)
+        result = battle.simulate_combat()
+        self.attacking_country.attack_cooldown = current_time + cooldown_time
+        self.defending_country.attack_cooldown = current_time + cooldown_time
+        if result == "attacker":
             if self.defending_country in enemy.territories:
                 enemy.territories.remove(self.defending_country)
-
-            self.territories.append(self.defending_country)
-            attacker_loss = defender_units
-            self.attacking_country.units = max(1, attacker_units - attacker_loss)
-            self.defending_country.units = 1
-            self.defending_country.attack_cooldown = current_time + cooldown_time
+            if self.defending_country not in self.territories:
+                self.territories.append(self.defending_country)
             return "win"
         else:
-            attacker_loss = attacker_units // 2
-            defender_loss = defender_units // 4
-            self.defending_country.attack_cooldown = current_time + cooldown_time
-            self.attacking_country.units = max(1, attacker_units - attacker_loss)
-            self.defending_country.units = max(1, defender_units - defender_loss)
             return "lose"
-
-    def buy_infantry(self, country,amount=1):
+          
+    def buy_units(self, country,type,amount=1):
         if country in self.territories:
-            cost = 5
+            cost = STATS[type]["cost"] * amount
             if self.currency >= cost:
                 self.currency -= cost
-                country.units["infantry"] = country.units.get("infantry", 0) + amount
-
-    def buy_tank(self, country, amount=1):
-        if country in self.territories:
-            cost = 15
-            if self.currency >= cost:
-                self.currency -= cost
-                country.units["tank"] = country.units.get("tank", 0) + amount
-
-    def buy_artillery(self, country, amount=1):
-        if country in self.territories:
-            cost = 20
-            if self.currency >= cost:
-                self.currency -= cost
-                country.units["artillery"] = country.units.get("artillery", 0) + amount
+                country.units[type] = country.units.get(type, 0) + amount
 
     def update(self):
         self.update_income()
@@ -80,16 +51,16 @@ class Player:
 
 #moves the amount of units from original to selected country
 #if amount is too great then 1 - country units is moved from min function
-    def move_units(self, original_country, selected_country, amount):
+    def move_units(self, original_country, selected_country, type,amount):
         if original_country not in self.territories or selected_country not in self.territories:
             return False
         if selected_country.name not in original_country.adjacent:
             return False
-        amount = min(amount, original_country.units["infantry"] - 1)
+        amount = min(amount, original_country.units[type] - 1)
         if amount <= 0:
             return False
-        original_country.units["infantry"] -= amount
-        selected_country.units["infantry"] += amount
+        original_country.units[type] -= amount
+        selected_country.units[type] += amount
         return True
 
 class AI(Player):

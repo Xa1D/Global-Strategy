@@ -3,7 +3,7 @@ import pygame
 
 class UI:
     def __init__(self):
-        self.text_font = pygame.font.SysFont(None, 35)
+        self.text_font = pygame.font.SysFont("Roboto", 35)
         self.menu_font = pygame.font.SysFont("cambria", 60)
 
         self.sidebar = Sidebar(pos=(1000, 0), width=280, height=720, font=self.text_font)
@@ -52,7 +52,6 @@ class UI:
         screen.blit(text, rect)
 
     def update_sidebar(self,selected_country,player,buy_units,enter_attack,enter_move):
-        self.sidebar.buttons.clear()
         self.sidebar.labels.clear()
         if selected_country:
             self.sidebar.add_text("Units", (1020, 10))

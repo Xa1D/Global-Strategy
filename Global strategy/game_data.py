@@ -2,7 +2,7 @@ import geopandas
 
 #reading the file from natural earth and filtering the required countries
 data = geopandas.read_file("./ne_50m_admin_0_countries/ne_50m_admin_0_countries.shp")
-remove = ['Russia', 'Vatican', 'Guernsey', 'Liechtenstein', 'Isle of Man', 'San Marino','Monaco', 'Aland','Faroe Islands', 'Andorra','Jersey']
+remove = ['Russia', 'Vatican', 'Guernsey', 'Liechtenstein', 'Isle of Man', 'San Marino','Monaco', 'Aland','Faroe Islands', 'Andorra','Jersey', 'Malta']
 countries = {}
 
 for index, row in data.iterrows():

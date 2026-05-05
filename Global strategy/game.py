@@ -13,6 +13,8 @@ class Game:
         self.UI = UI()
 
         self.world = Map()
+        self.world.create_map()
+
         self.player_country, self.enemy_country = None, None
         self.player, self.enemy = None, None
 
@@ -26,38 +28,25 @@ class Game:
         self.selected_country, self.attacking_country = None, None
         self.last_income_time = pygame.time.get_ticks()
 
-        self.UI.update_sidebar(self.selected_country, self.player, self.update_unit_panel, self.enter_attack, self.enter_move)
-
         self.game_result = None
         self.state = "setup"
 
     def buy_infantry_country(self):
         if self.selected_country:
-            self.player.buy_infantry(self.selected_country)
+            self.player.buy_units(self.selected_country, "infantry")
 
     def buy_tank_country(self):
         if self.selected_country:
-            self.player.buy_tank(self.selected_country)
+            self.player.buy_units(self.selected_country, "tank")
 
     def buy_artillery_country(self):
         if self.selected_country:
-            self.player.buy_artillery(self.selected_country)
+            self.player.buy_units(self.selected_country, "artillery")
 
     def update_unit_panel(self):
         self.UI.panel_visible = True
         self.UI.open_units_info(self.buy_infantry_country, self.buy_tank_country, self.buy_artillery_country)
         self.UI.update_sidebar(self.selected_country, self.player, self.update_unit_panel, self.enter_attack, self.enter_move)
-
-#game ends when player captures all territories or loses all territories
-    def check_win(self):
-        if len(self.player.territories) == len(self.world.countries):
-            self.state = "game_over"
-            self.game_result = "win"
-            self.end_time = pygame.time.get_ticks()
-        elif len(self.player.territories) == 0:
-            self.state = "game_over"
-            self.game_result = "lose"
-            self.end_time = pygame.time.get_ticks()
 
 #enters attack when attack button is clicked
     def enter_attack(self):
@@ -78,39 +67,21 @@ class Game:
             self.UI.open_move_info()
             self.UI.highlight_move(self.move_from, self.world, self.player)
 
-#handles events based on state of the game
-    def handle_event(self,event):
-            if self.state == "setup":
-                self.handle_setup(event)
-                return 
-            if self.state == "game_over":
-                if event.type == pygame.MOUSEBUTTONDOWN:
-                    return "menu"
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_TAB:
-                    self.UI.player_sidebar_visible = not self.UI.player_sidebar_visible
-                if event.key == pygame.K_ESCAPE:
-                    return "pause"
-            if self.state == "attacking":
-                return
-            if self.UI.panel_visible:
-                self.UI.panel.handle_event(event)
-            self.UI.sidebar.handle_event(event)
-            world_pos = self.world.get_world_pos()
-            point = Point(world_pos.x,world_pos.y)
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                clicked_country = None
-                for country in self.world.countries.values():
-                   if country.polygon.contains(point):
-                      clicked_country = country
-                      self.handle_country_click(clicked_country)
+#game ends when player captures all territories or loses all territories
+    def check_win(self):
+        if len(self.player.territories) == len(self.world.countries):
+            self.state = "game_over"
+            self.game_result = "win"
+            self.end_time = pygame.time.get_ticks()
+        elif len(self.player.territories) == 0:
+            self.state = "game_over"
+            self.game_result = "lose"
+            self.end_time = pygame.time.get_ticks()
 
 #allows player to choose starting countries
-    def handle_setup(self, event):
+    def handle_setup(self, event, point):
         if event.type != pygame.MOUSEBUTTONDOWN:
             return
-        world_pos = self.world.get_world_pos()
-        point = Point(world_pos.x,world_pos.y)
         for country in self.world.countries.values():
             if country.polygon.contains(point):
                 if self.UI.setup_mode == "player":
@@ -138,7 +109,6 @@ class Game:
             self.state = "play"
             self.UI.remove_highlight(self.world)
             self.UI.update_sidebar(self.selected_country, self.player, self.update_unit_panel, self.enter_attack, self.enter_move)
-
 #changes state to attacking and creates an incoming attack
     def handle_attack(self, clicked_country):
          if self.attacking_country:
@@ -158,19 +128,6 @@ class Game:
                         self.attacking_country = None
                         self.UI.update_sidebar(self.selected_country, self.player, self.update_unit_panel, self.enter_attack, self.enter_move)
 
-    def select_country(self, clicked_country):
-        self.selected_country = clicked_country 
-        self.UI.remove_highlight(self.world)
-        self.UI.update_sidebar(self.selected_country, self.player, self.update_unit_panel, self.enter_attack, self.enter_move)
-    
-    def deselect_country(self):
-        self.selected_country = None
-        self.attacking_country = None
-        self.UI.units_sidebar_visible = False
-        self.UI.remove_highlight(self.world)
-        self.UI.update_sidebar(self.selected_country, self.player, self.update_unit_panel, self.enter_attack, self.enter_move)
-        self.state = "play"
-
 #handles player clicking countries on map  
     def handle_country_click(self, clicked_country):
         if self.selected_country == clicked_country:
@@ -183,6 +140,45 @@ class Game:
             self.handle_attack(clicked_country)
             return  
         self.select_country(clicked_country)
+
+#handles events based on state of the game
+    def handle_event(self,event):
+            point = Point(self.world.get_world_pos())
+            if self.state == "setup":
+                self.handle_setup(event, point)
+                return 
+            if self.state == "game_over":
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    return "menu"
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_TAB:
+                    self.UI.player_sidebar_visible = not self.UI.player_sidebar_visible
+                if event.key == pygame.K_ESCAPE:
+                    return "pause"
+            if self.state == "attacking":
+                return
+            if self.UI.panel_visible:
+                self.UI.panel.handle_event(event)
+            self.UI.sidebar.handle_event(event)
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                clicked_country = None
+                for country in self.world.countries.values():
+                   if country.polygon.contains(point):
+                      clicked_country = country
+                      self.handle_country_click(clicked_country)
+
+    def select_country(self, clicked_country):
+        self.selected_country = clicked_country 
+        self.UI.remove_highlight(self.world)
+        self.UI.update_sidebar(self.selected_country, self.player, self.update_unit_panel, self.enter_attack, self.enter_move)
+    
+    def deselect_country(self):
+        self.selected_country = None
+        self.attacking_country = None
+        self.UI.units_sidebar_visible = False
+        self.UI.remove_highlight(self.world)
+        self.UI.update_sidebar(self.selected_country, self.player, self.update_unit_panel, self.enter_attack, self.enter_move)
+        self.state = "play"
 
     def update(self):
         if self.state == "setup":
@@ -209,7 +205,6 @@ class Game:
                 self.result_start_time = current_time
                 self.UI.remove_highlight(self.world)
                 self.attacking_country = None
-                self.UI.update_sidebar(self.selected_country, self.player, self.update_unit_panel, self.enter_attack, self.enter_move)
         elif self.attack_result:
             if current_time - self.result_start_time >= self.result_duration:
                 self.attack_result = None

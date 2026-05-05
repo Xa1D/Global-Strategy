@@ -1,4 +1,5 @@
 import pygame
+from shapely import Point
 from country_coords import countries
 from GUI import Camera
 from country import Country
@@ -9,7 +10,6 @@ class Map:
         self.height = 4000
         self.country_data = countries
         self.countries = {}
-        self.create_map()
         self.font = pygame.font.SysFont(None, 24)
         self.hovered_country = None
         self.camera = Camera()
@@ -41,8 +41,9 @@ class Map:
         self.camera.update()
         self.hovered_country = None
         world_pos = self.get_world_pos()
+        position = Point(world_pos)
         for country in self.countries.values():
-            country.update(world_pos)
+            country.update(position)
             if country.hovered:
                 self.hovered_country = country
         
@@ -55,7 +56,7 @@ class Map:
 "Republic of Serbia": 5,"Romania": 5,"Portugal": 5,"Poland": 15,"Norway": 10,"Netherlands": 12,"Montenegro": 5,"Moldova": 5,"North Macedonia": 5,
 "Luxembourg": 5,"Lithuania": 5,"Latvia": 5,"Kosovo": 15,"Italy": 20,"Ireland": 10,"Iceland": 10,"Hungary": 10,
 "Greece": 10,"Germany": 20,"France": 20,"Finland": 10,"Estonia": 8,"Denmark": 10,"Czechia": 7,"Croatia": 10,"Bulgaria": 10,"Bosnia and Herzegovina": 6,
-"Belgium": 10, "Belarus": 8,"Austria": 12,"Albania": 10, "Malta": 6}
+"Belgium": 10, "Belarus": 8,"Austria": 12,"Albania": 10}
       
       for country in self.countries.values():
         units = starting_units[country.name]
@@ -66,8 +67,14 @@ class Map:
         country.units["tank"] = tank_units
         country.units["artillery"] = artillery_units
 
-#adding adjacent countries which do not intersect
-    def add_adjacent_countries(self,country,adjacent):
+#storing adjacent countries through checking if their polygons intersect
+    def create_adjacent_countries(self, country):
+        adjacent = []
+        country_polygon = self.countries[country].polygon
+        for name, neighbour in self.countries.items():
+            if country != name:
+                if country_polygon.intersects(neighbour.polygon):
+                    adjacent.append(name)
         if country == "United Kingdom":
             adjacent += ["Ireland", "France", "Iceland"]
         elif country == "Ireland":
@@ -86,16 +93,5 @@ class Map:
             adjacent += ["Estonia"]
         elif country == "Estonia":
             adjacent += ["Finland"]
-        return adjacent
-
-#storing adjacent countries through checking if their polygons intersect
-    def create_adjacent_countries(self, country):
-        adjacent = []
-        country_polygon = self.countries[country].polygon
-        for name, neighbour in self.countries.items():
-            if country != name:
-                if country_polygon.intersects(neighbour.polygon):
-                    adjacent.append(name)
-        adjacent = self.add_adjacent_countries(country,adjacent)
         return list(set(adjacent))
             

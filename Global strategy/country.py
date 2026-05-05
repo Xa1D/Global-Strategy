@@ -37,7 +37,7 @@ class Country:
         pygame.draw.polygon(screen,colour,self.get_coordinates(scroll))
         pygame.draw.polygon(screen,("white"),self.get_coordinates(scroll),width=1)
 
-    def update(self, mouse_pos):
+    def update(self, position):
         self.hovered = False
-        if Point(mouse_pos.x, mouse_pos.y).within(self.polygon):
+        if self.polygon.contains(position):
             self.hovered = True
