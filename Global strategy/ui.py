@@ -3,6 +3,7 @@ import pygame
 
 class UI:
     def __init__(self):
+        self.clock = pygame.time.Clock()
         self.text_font = pygame.font.SysFont("Roboto", 35)
         self.menu_font = pygame.font.SysFont("cambria", 60)
 
@@ -23,27 +24,32 @@ class UI:
         self.continue_button = Button("Continue", (640, 300), self.menu_font, "white", "blue", image=self.play_img)
         self.newgame_button = Button("New Game", (640, 420), self.menu_font, "white", "blue", image=self.play_img)
         self.return_button = Button("Return", (640, 540), self.menu_font, "white", "red", image=self.quit_img)
+
+        self.europe_button = Button("Europe", (640, 250), self.menu_font, "white", "blue", image=self.play_img)
+        self.asia_button = Button("Asia", (640, 385), self.menu_font, "white", "blue", image=self.play_img)
+        self.africa_button = Button("Africa", (640, 510), self.menu_font, "white", "blue", image=self.play_img)
  
         self.menu_buttons = [self.play_button, self.quit_button]
         self.option_buttons = [self.continue_button, self.newgame_button, self.return_button]
+        self.map_buttons = [self.europe_button,self.asia_button,self.africa_button]
 
-    def remove_highlight(self,world):
-        for country in world.countries.values():
+    def remove_highlight(self,map):
+        for country in map.countries.values():
             country.highlighted = False
 
-    def highlight_attack(self,selected_country,world,player):
+    def highlight_attack(self,selected_country,map,player):
         for name in selected_country.adjacent:
-            if world.countries[name] not in player.territories and not world.countries[name].combat:
-                world.countries[name].highlighted = True
+            if map.countries[name] not in player.territories and not map.countries[name].combat:
+                map.countries[name].highlighted = True
         
-    def highlight_move(self,selected_country,world,player):
+    def highlight_move(self,selected_country,map,player):
         for name in selected_country.adjacent:
-            if world.countries[name] in player.territories and not world.countries[name].combat:
-                world.countries[name].highlighted = True
+            if map.countries[name] in player.territories and not map.countries[name].combat:
+                map.countries[name].highlighted = True
 
-    def draw_setup(self,screen,world):
+    def draw_setup(self,screen,map_display):
         screen.fill((0, 0, 0))
-        world.draw(screen, None, None)
+        map_display.draw(None, None)
         if self.setup_mode == "player":
              text = self.text_font.render("Choose your starting country", True, (255, 255, 255))
         elif self.setup_mode == "enemy":
@@ -52,12 +58,13 @@ class UI:
         screen.blit(text, rect)
 
     def update_sidebar(self,selected_country,player,buy_units,enter_attack,enter_move):
+        self.sidebar.buttons.clear()
         self.sidebar.labels.clear()
         if selected_country:
-            self.sidebar.add_text("Units", (1020, 10))
-            self.sidebar.add_text(f"Infantry: {selected_country.units['infantry']}", (1020, 40))
-            self.sidebar.add_text(f"Tanks: {selected_country.units['tank']}", (1020, 70))
-            self.sidebar.add_text(f"Artillery: {selected_country.units['artillery']}", (1020, 100))
+            self.sidebar.add_text(f"{selected_country.name}",(1020,10))
+            self.sidebar.add_text(f"Infantry: {selected_country.units['infantry']}", (1020, 45))
+            self.sidebar.add_text(f"Tanks: {selected_country.units['tank']}", (1020, 85))
+            self.sidebar.add_text(f"Artillery: {selected_country.units['artillery']}", (1020, 125))
         if selected_country and selected_country in player.territories:
             self.sidebar.add_button("Buy Units",(1120,210), buy_units)
             self.sidebar.add_button("Attack", (1120, 270), enter_attack)
@@ -83,14 +90,21 @@ class UI:
     def close_panel(self):
         self.panel_visible = False
 
-    def open_move_info(self):
+    def open_move_info(self,move_infantry,move_tank,move_artillery):
         self.panel.buttons.clear()
         self.panel.labels.clear()
         self.panel.add_text("Select amount and type of units to move", (370, 60))
-        self.panel.add_button("Move Infantry", (480, 150), None)
-        self.panel.add_button("Move Tank", (480, 230), None)
-        self.panel.add_button("Move Artillery", (480, 310), None)
-        self.panel.add_button("Back         ", (480, 410), self.close_panel)
+        self.panel.add_text("Infantry", (390, 150))
+        self.panel.add_button("+",(510, 150), None)
+        self.panel.add_button("-",(550, 150), None)
+        self.panel.add_text("Tank    ", (390, 230))
+        self.panel.add_button("+",(510, 230), None)
+        self.panel.add_button("-",(550, 230), None)
+        self.panel.add_text("Artillery", (390, 310))
+        self.panel.add_button("+",(510, 310), None)
+        self.panel.add_button("-",(550, 310), None)
+        self.panel.add_button("Confirm move", (400, 410))
+        self.panel.add_button("Back         ", (480, 500), self.close_panel)
 
     def open_attack_info(self):
         self.panel.buttons.clear()
@@ -133,7 +147,7 @@ class UI:
         screen.blit(currency_text, (250, 10))
         screen.blit(income_text, (500, 10))
         
-    def draw_fps(self,clock,screen):
+    def draw_fps(self,screen,clock):
         fps_text = self.text_font.render(f"FPS: {int(clock.get_fps())}", True, (255, 255, 255))
         screen.blit(fps_text, (50, 10))
 
@@ -144,6 +158,25 @@ class UI:
         for button in self.menu_buttons:
             button.update(screen)
 
+    def draw_map_selection(self,screen):
+        screen.fill("black")
+        text = self.menu_font.render("SELECT A MAP TO PLAY ON", True, "white")
+        screen.blit(text,text.get_rect(center=(640,100)))
+        for button in self.map_buttons:
+            button.update(screen)
+
+    def select_map(self,event):
+        if event.type != pygame.MOUSEBUTTONDOWN:
+            return None
+        mouse_pos = event.pos
+        if self.europe_button.rect.collidepoint(mouse_pos):
+            return "Europe"
+        if self.asia_button.rect.collidepoint(mouse_pos):
+            return "Asia"
+        if self.africa_button.rect.collidepoint(mouse_pos):
+            return "Africa"
+        return None 
+ 
     def draw_pause(self,screen):
         screen.fill("black")
         text = self.menu_font.render("PAUSED", True, "white")
@@ -173,13 +206,15 @@ class UI:
             return "menu"
         return None
 
-    def draw(self,screen,world,state,selected_country,player,enemy,game_result):
+    def draw(self,screen,map_display,state,selected_country,player,enemy,game_result):
         screen.fill((0, 0, 0))
+        if state == "map_selection":
+            self.draw_map_selection(screen)
         if state == "setup":
-            self.draw_setup(screen, world)
+            self.draw_setup(screen, map_display)
             return
         else:
-            world.draw(screen,player,enemy)
+            map_display.draw(player,enemy)
         if self.panel_visible:
             self.panel.draw(screen)
         if selected_country:

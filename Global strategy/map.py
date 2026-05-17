@@ -1,18 +1,30 @@
 import pygame
-from shapely import Point
-from country_coords import countries
+from shapely.geometry import Point
 from GUI import Camera
 from country import Country
+import json
 
 class Map:
-    def __init__(self):
-        self.width = 8000
-        self.height = 4000
-        self.country_data = countries
+    def __init__(self, map_file):
+        self.file = map_file
+        self.width, self.height = self.get_size()
         self.countries = {}
-        self.font = pygame.font.SysFont(None, 24)
-        self.hovered_country = None
-        self.camera = Camera()
+        self.country_data = self.get_map_data()
+        self.create_map()   
+
+    def get_size(self):
+        if self.file == "europe_coords.json":
+            width, height = 8000, 4000
+        elif self.file == "asia_coords.json":
+            width, height = 4000, 2000
+        elif self.file == "africa_coords.json":
+            width, height = 4000, 2000
+        return width, height
+        
+    def get_map_data(self):
+        with open(self.file,"r") as file:
+            country_data = json.load(file)
+        return country_data
 
     def create_map(self):
         self.get_countries()
@@ -24,32 +36,52 @@ class Map:
         for name,coords in self.country_data.items():
           map_coords = []
           for coord in coords:
-              x = (self.width / 360) * (180 + coord[0])
+              x = (self.width / 360) * (coord[0] + 180)
               y = (self.height / 180) * (90 - coord[1])
               map_coords.append((x, y))
           self.countries[name] = Country(name, map_coords)
-
-    def draw(self, screen, player, enemy):
-     for country in self.countries.values():
-        country.draw(screen, self.camera.pos, player,enemy)
-
-    def get_world_pos(self):
-        mouse_pos = pygame.mouse.get_pos()
-        return pygame.Vector2(mouse_pos) + self.camera.pos
-
-    def update(self):
-        self.camera.update()
-        self.hovered_country = None
-        world_pos = self.get_world_pos()
-        position = Point(world_pos)
-        for country in self.countries.values():
-            country.update(position)
-            if country.hovered:
-                self.hovered_country = country
         
     def get_adjacent(self):
+        if self.file == "europe_coords.json":
+            extra_adjacent = {"United Kingdom": ["Ireland", "France", "Iceland"],
+            "Ireland": ["United Kingdom", "Iceland"],
+            "Iceland": ["United Kingdom", "Ireland"],
+            "Denmark": ["Norway", "Sweden"],
+            "Sweden": ["Denmark"],
+            "Norway": ["Denmark"],
+            "Finland": ["Estonia"],
+            "Estonia": ["Finland"],
+            "France": ["United Kingdom"]}
+
+        elif self.file == "asia_coords.json":
+            extra_adjacent = {"Japan": ["South Korea", "China"],
+            "South Korea": ["Japan"],
+            "Sri Lanka": ["India"],
+            "India": ["Sri Lanka"],
+            "Philippines": ["Vietnam", "Malaysia"],
+            "Vietnam": ["Philippines"],
+            "Malaysia": ["Philippines"],
+            "Indonesia": ["Malaysia", "Papua New Guinea"],
+            "Papua New Guinea": ["Indonesia"]}
+
+        elif self.file == "africa_coords.json":
+            extra_adjacent = {"Madagascar": ["Mozambique", "Tanzania", "Comoros"],
+            "Mozambique": ["Madagascar", "Comoros"],
+            "Tanzania": ["Madagascar", "Comoros"],
+            "Comoros": ["Madagascar", "Mozambique", "Tanzania"],
+            "São Tomé and Príncipe": ["Gabon", "Cameroon"],
+            "Gabon": ["São Tomé and Príncipe"],
+            "Cameroon": ["São Tomé and Príncipe"]}
+
         for name, country in self.countries.items():
-            country.adjacent = self.create_adjacent_countries(name)
+            adjacent = []
+            for neighbour_name, neighbour in self.countries.items():
+                if name != neighbour_name:
+                    if country.polygon.intersects(neighbour.polygon):
+                        adjacent.append(neighbour_name)
+            if name in extra_adjacent:
+                adjacent += extra_adjacent[name]
+            country.adjacent = list(set(adjacent))
 
     def get_units(self):
       starting_units = {"United Kingdom": 20,"Ukraine": 12,"Switzerland": 8,"Sweden": 9,"Spain": 15,"Slovakia": 5,"Slovenia": 5,
@@ -59,7 +91,7 @@ class Map:
 "Belgium": 10, "Belarus": 8,"Austria": 12,"Albania": 10}
       
       for country in self.countries.values():
-        units = starting_units[country.name]
+        units = starting_units.get(country.name,10)
         infantry_units = units // 2
         artillery_units = (units - infantry_units) // 3
         tank_units = units - infantry_units - artillery_units
@@ -67,31 +99,34 @@ class Map:
         country.units["tank"] = tank_units
         country.units["artillery"] = artillery_units
 
-#storing adjacent countries through checking if their polygons intersect
-    def create_adjacent_countries(self, country):
-        adjacent = []
-        country_polygon = self.countries[country].polygon
-        for name, neighbour in self.countries.items():
-            if country != name:
-                if country_polygon.intersects(neighbour.polygon):
-                    adjacent.append(name)
-        if country == "United Kingdom":
-            adjacent += ["Ireland", "France", "Iceland"]
-        elif country == "Ireland":
-            adjacent += ["United Kingdom", "Iceland"]
-        elif country == "Iceland":
-            adjacent += ["United Kingdom", "Ireland"]
-        elif country == "France":
-            adjacent += ["United Kingdom"]
-        elif country == "Denmark":
-            adjacent += ["Norway", "Sweden"]
-        elif country == "Norway":
-            adjacent += ["Denmark"]
-        elif country == "Sweden":
-            adjacent += ["Denmark"]
-        elif country == "Finland":
-            adjacent += ["Estonia"]
-        elif country == "Estonia":
-            adjacent += ["Finland"]
-        return list(set(adjacent))
+
+class MapDisplay:
+    def __init__(self, map, screen):
+        self.map = map
+        self.screen = screen
+        self.camera = Camera(self.get_camera_pos())
+
+    def get_camera_pos(self):
+        if self.map.file == "europe_coords.json":
+            return [3500, 500]
+        elif self.map.file == "asia_coords.json":
+            return [2400, 240]
+        elif self.map.file == "africa_coords.json":
+            return [1700, 500]
+
+    def get_map_pos(self):
+        mouse_pos = pygame.mouse.get_pos()
+        x = (mouse_pos[0] / self.camera.zoom) + self.camera.pos[0]
+        y = (mouse_pos[1] / self.camera.zoom) + self.camera.pos[1]
+        return (x, y)
+
+    def update(self,event):
+        self.camera.update(event)
+
+    def draw(self, player, enemy):
+        position = Point(self.get_map_pos())
+        for country in self.map.countries.values():
+            country.check_hovered(position)
+            country.draw(self.screen, self.camera.pos, self.camera.zoom, player, enemy)
+
             

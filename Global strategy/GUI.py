@@ -1,15 +1,15 @@
 import pygame
-
+pygame.init()
 class Button():
-    def __init__(self, text, position, font, base_colour, hover_colour,function=None, base_bg=(50,50,50), hover_bg=(0,100,200),padding=(10,10), image=None):
+    def __init__(self, text, position, font, base_colour, hover_colour,function=None, image=None):
         self.font = font
         self.text_input = text
         self.base_colour = base_colour
         self.hover_colour = hover_colour
         self.function = function
-        self.base_bg = base_bg
-        self.hover_bg = hover_bg
-        self.padding = padding
+        self.base_bg = (50,50,50)
+        self.hover_bg = (0,100,200)
+        self.padding = (10,10)
 
         self.text_base = self.font.render(self.text_input, True, self.base_colour)
         self.text_hover = self.font.render(self.text_input, True, self.hover_colour)
@@ -49,13 +49,13 @@ class Button():
                 self.function()
 
 class Sidebar:
-    def __init__(self, pos, width, height, font, bg_colour=(30,30,30), padding=10):
+    def __init__(self, pos, width, height, font):
         self.pos = pos
         self.width = width
         self.height = height
         self.font = font
-        self.bg_colour = bg_colour
-        self.padding = padding
+        self.bg_colour = (30,30,30)
+        self.padding = 10
         self.buttons = []
         self.labels = []
 
@@ -83,17 +83,33 @@ class Sidebar:
             button.update(screen)
 
 class Camera:
-    def __init__(self):
+    def __init__(self,pos):
         self.speed = 8
-        self.pos = pygame.Vector2(3500,450)
+        self.pos = [pos[0],pos[1]]
+        self.zoom = 1
+        self.zoom_range = [0.5,2]
+        self.zoom_speed = 0.05
 
-    def update(self):
+    def handle_scroll(self,event):
+        if event.type == pygame.MOUSEWHEEL:
+                original_zoom = self.zoom
+                if event.y > 0:
+                    self.zoom = min(self.zoom + self.zoom_speed, self.zoom_range[1])
+                if event.y < 0:
+                    self.zoom = max(self.zoom - self.zoom_speed, self.zoom_range[0])
+
+                mouse_x, mouse_y = pygame.mouse.get_pos()
+                self.pos[0] = self.pos[0] + mouse_x / original_zoom - mouse_x / self.zoom
+                self.pos[1] = self.pos[1] + mouse_y / original_zoom - mouse_y / self.zoom
+                   
+    def update(self,event):
         keys = pygame.key.get_pressed()
         if keys[pygame.K_a]:
-            self.pos.x -= self.speed
+            self.pos[0] -= self.speed
         if keys[pygame.K_d]:
-            self.pos.x += self.speed
+            self.pos[0] += self.speed
         if keys[pygame.K_w]:
-            self.pos.y -= self.speed
+            self.pos[1] -= self.speed
         if keys[pygame.K_s]:
-            self.pos.y += self.speed
+            self.pos[1] += self.speed
+        self.handle_scroll(event)

@@ -1,7 +1,6 @@
 import random
 import pygame
 from combat import Combat, STATS
-from country import Country
 
 class Player:
     def __init__(self, country):
@@ -51,16 +50,19 @@ class Player:
 
 #moves the amount of units from original to selected country
 #if amount is too great then 1 - country units is moved from min function
-    def move_units(self, original_country, selected_country, type,amount):
+    def move_units(self, original_country, selected_country, infantry_amount, tank_amount, artillery_amount):
         if original_country not in self.territories or selected_country not in self.territories:
             return False
         if selected_country.name not in original_country.adjacent:
             return False
-        amount = min(amount, original_country.units[type] - 1)
-        if amount <= 0:
+        if infantry_amount + tank_amount + artillery_amount <= 0:
             return False
-        original_country.units[type] -= amount
-        selected_country.units[type] += amount
+        original_country.units["infantry"] -= infantry_amount
+        selected_country.units["infantry"] += infantry_amount
+        original_country.units["tank"] -= tank_amount
+        selected_country.units["tank"] += tank_amount
+        original_country.units["artillery"] -= artillery_amount
+        selected_country.units["artillery"] += artillery_amount
         return True
 
 class AI(Player):
