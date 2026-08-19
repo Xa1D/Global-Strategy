@@ -90,8 +90,9 @@ class Camera:
         self.zoom_range = [0.5,2]
         self.zoom_speed = 0.05
 
-    def handle_scroll(self,event):
-        if event.type == pygame.MOUSEWHEEL:
+    def handle_scroll(self,events):
+        for event in events:
+            if event.type == pygame.MOUSEWHEEL:
                 original_zoom = self.zoom
                 if event.y > 0:
                     self.zoom = min(self.zoom + self.zoom_speed, self.zoom_range[1])
@@ -102,7 +103,7 @@ class Camera:
                 self.pos[0] = self.pos[0] + mouse_x / original_zoom - mouse_x / self.zoom
                 self.pos[1] = self.pos[1] + mouse_y / original_zoom - mouse_y / self.zoom
                    
-    def update(self,event):
+    def update(self,events):
         keys = pygame.key.get_pressed()
         if keys[pygame.K_a]:
             self.pos[0] -= self.speed
@@ -112,4 +113,4 @@ class Camera:
             self.pos[1] -= self.speed
         if keys[pygame.K_s]:
             self.pos[1] += self.speed
-        self.handle_scroll(event)
+        self.handle_scroll(events)

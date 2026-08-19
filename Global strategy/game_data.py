@@ -25,7 +25,7 @@ class GameData:
             
     def get_countries(self):
         countries = {}
-        for index, row in self.data.iterrows():
+        for i, row in self.data.iterrows():
             if row["CONTINENT"] == self.continent and row["ADMIN"] not in self.remove:
                 name = row["ADMIN"]
                 shape = row["geometry"].simplify(0.05)

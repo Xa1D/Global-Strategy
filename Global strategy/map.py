@@ -1,7 +1,7 @@
 import pygame
 from shapely.geometry import Point
 from GUI import Camera
-from country import Country
+from Territory import Territory
 import json
 
 class Map:
@@ -39,7 +39,7 @@ class Map:
               x = (self.width / 360) * (coord[0] + 180)
               y = (self.height / 180) * (90 - coord[1])
               map_coords.append((x, y))
-          self.countries[name] = Country(name, map_coords)
+          self.countries[name] = Territory(name, map_coords)
         
     def get_adjacent(self):
         if self.file == "europe_coords.json":
@@ -61,17 +61,16 @@ class Map:
             "Philippines": ["Vietnam", "Malaysia"],
             "Vietnam": ["Philippines"],
             "Malaysia": ["Philippines"],
-            "Indonesia": ["Malaysia", "Papua New Guinea"],
-            "Papua New Guinea": ["Indonesia"]}
+            "Indonesia": ["Malaysia"]}
 
         elif self.file == "africa_coords.json":
-            extra_adjacent = {"Madagascar": ["Mozambique", "Tanzania", "Comoros"],
+            extra_adjacent = {"Madagascar": ["Mozambique", "United Republic of Tanzania", "Comoros"],
             "Mozambique": ["Madagascar", "Comoros"],
-            "Tanzania": ["Madagascar", "Comoros"],
-            "Comoros": ["Madagascar", "Mozambique", "Tanzania"],
-            "São Tomé and Príncipe": ["Gabon", "Cameroon"],
-            "Gabon": ["São Tomé and Príncipe"],
-            "Cameroon": ["São Tomé and Príncipe"]}
+            "United Republic of Tanzania": ["Madagascar", "Comoros"],
+            "Comoros": ["Madagascar", "Mozambique", "United Republic of Tanzania"],
+            "São Tomé and Principe": ["Gabon", "Cameroon"],
+            "Gabon": ["São Tomé and Principe"],
+            "Cameroon": ["São Tomé and Principe"]}
 
         for name, country in self.countries.items():
             adjacent = []
@@ -120,13 +119,13 @@ class MapDisplay:
         y = (mouse_pos[1] / self.camera.zoom) + self.camera.pos[1]
         return (x, y)
 
-    def update(self,event):
-        self.camera.update(event)
+    def update(self,events):
+        self.camera.update(events)
 
-    def draw(self, player, enemy):
+    def draw(self, player, ai_players):
         position = Point(self.get_map_pos())
         for country in self.map.countries.values():
             country.check_hovered(position)
-            country.draw(self.screen, self.camera.pos, self.camera.zoom, player, enemy)
+            country.draw(self.screen, self.camera.pos, self.camera.zoom, player, ai_players)
 
             

@@ -1,17 +1,22 @@
 import pygame
 from map import Map, MapDisplay
 from shapely.geometry import Point
-from player import Player, AI
+from player import Player
+from ai import AI
 from ui import UI
-from handle_combat import CombatManager
-from handle_move import MoveManager
+from CombatManager import CombatManager
+from MoveManager import MoveManager
 
 class Game:
-    def __init__(self, screen, map_file, clock):
+    def __init__(self, screen, map_file, clock,ai_count=1):
         self.screen = screen
         self.font = pygame.font.SysFont(None, 35)
         self.clock = clock
         self.UI = UI()
+        self.UI.enemy_count = ai_count
+        self.UI.enemies_placed = 0
+        
+        self.start_pause = None
 
         self.combat_manager = CombatManager(self)
         self.move_manager = MoveManager(self)
@@ -20,8 +25,8 @@ class Game:
         self.map_display = MapDisplay(self.map,screen)
 
         self.player_country, self.enemy_country = None, None
-        self.player, self.enemy = None, None
-
+        self.player = None
+        self.ai_players = []
         self.clicked_country = None 
 
         self.selected_country, self.attacking_country = None, None
@@ -30,19 +35,34 @@ class Game:
         self.game_result = None
         self.state = "setup"
 
+    def shift_timers(self, paused_duration):
+        self.player.start_time += paused_duration
+        self.player.last_income_time += paused_duration
+        for ai in self.ai_players:
+            ai.start_time += paused_duration
+            ai.last_income_time += paused_duration
+            ai.next_action += paused_duration
+            ai.last_attack += paused_duration
+
     def buy_infantry_country(self):
         if self.selected_country:
             self.player.buy_units(self.selected_country, "infantry")
+            self.UI.update_sidebar(self.selected_country, self.player, self.update_unit_panel, self.combat_manager.enter_attack, self.move_manager.enter_move)
 
     def buy_tank_country(self):
         if self.selected_country:
             self.player.buy_units(self.selected_country, "tank")
+            self.UI.update_sidebar(self.selected_country, self.player, self.update_unit_panel, self.combat_manager.enter_attack, self.move_manager.enter_move)
 
     def buy_artillery_country(self):
         if self.selected_country:
             self.player.buy_units(self.selected_country, "artillery")
-    
+            self.UI.update_sidebar(self.selected_country, self.player, self.update_unit_panel, self.combat_manager.enter_attack, self.move_manager.enter_move)
+            
     def update_unit_panel(self):
+        if self.selected_country and self.selected_country.combat:
+            self.combat_manager.show_blocked_message("Country in combat")
+            return
         self.UI.panel_visible = True
         self.UI.open_units_info(self.buy_infantry_country, self.buy_tank_country, self.buy_artillery_country)
         self.UI.update_sidebar(self.selected_country, self.player, self.update_unit_panel, self.combat_manager.enter_attack, self.move_manager.enter_move)
@@ -70,10 +90,17 @@ class Game:
                     self.UI.setup_mode = "enemy"
                     return
                 elif self.UI.setup_mode == "enemy":
-                    if country != self.player_country:
-                        self.enemy_country = country
-                        self.enemy = AI(country, playstyle="aggressive")
-                        self.state = "play"
+                    taken = [self.player_country] + [ai.country for ai in self.ai_players]
+                    if country not in taken:
+                        playstyles = ["aggressive", "defensive","balanced"]
+                        playstyle = playstyles[len(self.ai_players) % len(playstyles)]
+                        offset = 5000 + len(self.ai_players) * 2500
+                        ai = AI(country, playstyle=playstyle,offset=offset)
+                        self.ai_players.append(ai)
+                        self.UI.enemies_placed += 1
+                        if self.UI.enemies_placed >= self.UI.enemy_count:
+                            self.state = "play"
+                        return
 
 #handles player clicking countries on map  
     def handle_country_click(self, clicked_country):
@@ -99,6 +126,8 @@ class Game:
                 self.handle_setup(event, point)
                 return 
             if self.state == "game_over":
+                self.UI.sidebar_visible = False
+                self.UI.player_sidebar_visible = False
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     return "menu"
             if event.type == pygame.KEYDOWN:
@@ -107,10 +136,13 @@ class Game:
                 if event.key == pygame.K_ESCAPE:
                     return "pause"
             if self.state == "attacking":
+                if self.UI.panel_visible:
+                    self.UI.panel.handle_event(event)
                 return
             if self.UI.panel_visible:
                 self.UI.panel.handle_event(event)
-            self.UI.sidebar.handle_event(event)
+            if self.UI.sidebar_visible:
+                self.UI.sidebar.handle_event(event)
             if event.type == pygame.MOUSEBUTTONDOWN:
                 self.clicked_country = None
                 for country in self.map.countries.values():
@@ -122,11 +154,13 @@ class Game:
         self.selected_country = clicked_country 
         self.UI.remove_highlight(self.map)
         self.UI.update_sidebar(self.selected_country, self.player, self.update_unit_panel, self.combat_manager.enter_attack, self.move_manager.enter_move)
+        self.UI.sidebar_visible = True
     
     def deselect_country(self):
         self.selected_country = None
         self.attacking_country = None
         self.UI.panel_visible = False
+        self.UI.sidebar_visible = False
         self.UI.remove_highlight(self.map)
         self.UI.update_sidebar(self.selected_country, self.player, self.update_unit_panel, self.combat_manager.enter_attack, self.move_manager.enter_move)
         self.state = "play"
@@ -134,24 +168,32 @@ class Game:
     def update(self,events):
         if self.state == "setup":
             return
-        if self.player is None or self.enemy is None:
+        if self.player is None or not self.ai_players:
             return
         if self.state != "game_over":
             self.map_display.update(events)
-            self.UI.update_player_sidebar(self.player,self.enemy)
-            if self.enemy:
-                self.enemy.update_ai(self.map, self.player)
-                self.enemy.update()
+            self.UI.update_player_sidebar(self.player,self.ai_players)
+            elapsed = pygame.time.get_ticks() - self.player.start_time
+            if elapsed >= 120000 and self.player.territories_at_2min is None:
+                self.player.territories_at_2min = len(self.player.territories)
+                for ai in self.ai_players:
+                    ai.territories_at_2min = len(ai.territories)
+            for ai in self.ai_players:
+                ai.update_ai(self.map, self.player,self.ai_players)
+                ai.update()
             if self.player:
                 self.player.update()
             self.check_win()
         self.combat_manager.update()
 
     def draw(self):
-        self.UI.draw(self.screen, self.map_display, self.state,self.selected_country,self.player, self.enemy,self.game_result)
+        self.UI.draw(self.screen, self.map_display, self.state, self.selected_country, self.player, self.ai_players, self.game_result)
         self.combat_manager.draw(self.screen)
         self.move_manager.draw(self.screen)
-        if self.enemy and self.enemy.state == "attacking":
-                text = self.font.render("Enemy Attacking", True, (255, 100, 100))
-                self.screen.blit(text, (600, 100))
-        self.UI.draw_fps(self.screen,self.clock)
+        current_display = 0
+        for ai in self.ai_players:
+            if ai.state == "attacking":
+                text = self.font.render(f"{ai.attacking_country.name} attacking {ai.defending_country.name}", True, (255, 100, 100))
+                self.screen.blit(text, (10, 680 - current_display*30))
+                current_display += 1
+        self.UI.draw_fps(self.screen, self.clock)
