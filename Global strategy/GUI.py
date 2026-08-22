@@ -58,6 +58,7 @@ class Sidebar:
         self.padding = 10
         self.buttons = []
         self.labels = []
+        self.dividers = []
 
     def add_text(self, text, position):
         self.labels.append((text, position))
@@ -65,6 +66,9 @@ class Sidebar:
     def add_button(self, text, position, function):
         button = Button(text=text, position=position, font=self.font, base_colour=(255,255,255), hover_colour=(255,255,0), function=function)
         self.buttons.append(button)
+
+    def add_divider(self,x_start,y_start,x_end,y_end):
+        self.dividers.append((x_start, y_start, x_end,y_end))
 
     def handle_event(self, event):
         for i in self.buttons:
@@ -74,11 +78,15 @@ class Sidebar:
         for text, position in self.labels:
             text_surface = self.font.render(text, True, (255, 255, 255))
             screen.blit(text_surface, position)
-            
+
+    def draw_dividers(self, screen):
+        for x_start, y_start, x_end,y_end in self.dividers:
+            pygame.draw.line(screen, (100, 100, 100), (x_start, y_start), (x_end, y_end), width=2)
 
     def draw(self, screen):
         pygame.draw.rect(screen, self.bg_colour, (self.pos[0], self.pos[1], self.width, self.height))
         self.draw_labels(screen)
+        self.draw_dividers(screen)
         for button in self.buttons:
             button.update(screen)
 

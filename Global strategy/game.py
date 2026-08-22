@@ -7,6 +7,7 @@ from ui import UI
 from CombatManager import CombatManager
 from MoveManager import MoveManager
 
+
 class Game:
     def __init__(self, screen, map_file, clock,ai_count=1):
         self.screen = screen
@@ -20,6 +21,7 @@ class Game:
 
         self.combat_manager = CombatManager(self)
         self.move_manager = MoveManager(self)
+     
 
         self.map = Map(map_file)
         self.map_display = MapDisplay(self.map,screen)
@@ -61,7 +63,7 @@ class Game:
             
     def update_unit_panel(self):
         if self.selected_country and self.selected_country.combat:
-            self.combat_manager.show_blocked_message("Country in combat")
+            self.combat_manager.show_message("Country in combat")
             return
         self.UI.panel_visible = True
         self.UI.open_units_info(self.buy_infantry_country, self.buy_tank_country, self.buy_artillery_country)
@@ -143,6 +145,8 @@ class Game:
                 self.UI.panel.handle_event(event)
             if self.UI.sidebar_visible:
                 self.UI.sidebar.handle_event(event)
+            if self.UI.player_sidebar_visible:
+                self.UI.player_sidebar.handle_event(event)
             if event.type == pygame.MOUSEBUTTONDOWN:
                 self.clicked_country = None
                 for country in self.map.countries.values():
@@ -187,7 +191,7 @@ class Game:
         self.combat_manager.update()
 
     def draw(self):
-        self.UI.draw(self.screen, self.map_display, self.state, self.selected_country, self.player, self.ai_players, self.game_result)
+        self.UI.draw(self.screen, self.map_display, self.state, self.player, self.ai_players, self.game_result)
         self.combat_manager.draw(self.screen)
         self.move_manager.draw(self.screen)
         current_display = 0

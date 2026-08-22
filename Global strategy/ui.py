@@ -4,21 +4,21 @@ import pygame
 class UI:
     def __init__(self):
         self.clock = pygame.time.Clock()
-        self.text_font = pygame.font.SysFont("Roboto", 32)
+        self.text_font = pygame.font.SysFont("Roboto", 29)
         self.menu_font = pygame.font.SysFont("cambria", 60)
-        self.result_font = pygame.font.SysFont("Roboto",32)
+        self.result_font = pygame.font.SysFont("Roboto",33)
         self.background_font = pygame.font.SysFont("Roboto", 20)
 
         self.sidebar = Sidebar(pos=(1000, 0), width=280, height=720, font=self.text_font)
         self.sidebar_visible = False
 
-        self.panel = Sidebar(pos=(350,50), width=650, height=590, font=self.text_font)
+        self.panel = Sidebar(pos=(320,50), width=650, height=590, font=self.text_font)
         self.panel_visible = False
 
         self.background_panel = Sidebar(pos=(350,50), width=650, height=620, font=self.background_font)
         self.background_panel_visible = False
 
-        self.player_sidebar = Sidebar(pos=(0,50), width=250, height=570, font=self.text_font)
+        self.player_sidebar = Sidebar(pos=(0,40), width=280, height=570, font=self.text_font)
         self.player_sidebar_visible = False
         self.setup_mode = "player"
         
@@ -61,6 +61,11 @@ class UI:
             if map.countries[name] in player.territories and not map.countries[name].combat:
                 map.countries[name].highlighted = True
 
+    def clear_panel(self,panel):
+        panel.buttons.clear()
+        panel.labels.clear()
+        panel.dividers.clear()
+
     def draw_setup(self,screen,map_display):
         screen.fill((0, 0, 0))
         map_display.draw(None, [])
@@ -72,8 +77,7 @@ class UI:
         screen.blit(text, rect)
 
     def update_sidebar(self,selected_country,player,buy_units,enter_attack,enter_move):
-        self.sidebar.buttons.clear()
-        self.sidebar.labels.clear()
+        self.clear_panel(self.sidebar)
         if selected_country:
             self.sidebar.add_text(f"{selected_country.name}",(1020,10))
             self.sidebar.add_text(f"Infantry: {selected_country.units['infantry']}", (1020, 45))
@@ -87,8 +91,7 @@ class UI:
     def update_player_sidebar(self,player,ai_players):
         if player is None:
             return
-        self.player_sidebar.buttons.clear()
-        self.player_sidebar.labels.clear()
+        self.clear_panel(self.player_sidebar)
         self.player_sidebar.add_text("Player Stats", (20, 50))
         self.player_sidebar.add_text(f"Territories: {len(player.territories)}", (20, 90))
         self.player_sidebar.add_text(f"Total infantry: {sum(c.units['infantry'] for c in player.territories)}", (20, 120))
@@ -101,6 +104,7 @@ class UI:
             self.player_sidebar.add_text(f"AI {count} currency: {ai.currency}", (20, y + 30))
             count += 1
             y += 60
+  
 
     def close_panel(self):
         self.panel_visible = False
@@ -109,8 +113,7 @@ class UI:
         self.panel_visible = True
 
     def open_move_info(self, move_from, count, adjust, confirm, cancel):
-        self.panel.buttons.clear()
-        self.panel.labels.clear()
+        self.clear_panel(self.panel)
         self.panel.add_text("Select amount and type of units to move", (370, 60))
 
         self.panel.add_text(f"Infantry: {count['infantry']} / {move_from.units['infantry']}", (390, 150))
@@ -129,8 +132,7 @@ class UI:
         self.panel.add_button("Cancel", (600, 460), cancel)
 
     def open_units_info(self,buy_infantry,buy_tank,buy_artillery):
-        self.panel.buttons.clear()
-        self.panel.labels.clear()
+        self.clear_panel(self.panel)
         self.panel.add_text("Select type of unit to buy:", (400, 60))
         self.panel.add_button("Buy Infantry  (5) ", (480, 150), buy_infantry)
         self.panel.add_button("Buy Tank      (15)", (480, 230), buy_tank)
@@ -150,8 +152,7 @@ class UI:
         return y + 12
 
     def open_background_panel(self, result, player, ai_players):
-        self.background_panel.buttons.clear()
-        self.background_panel.labels.clear()
+        self.clear_panel(self.background_panel)
         result_text = "You Win" if result == "win" else "You Lose"
         self.background_panel.add_text(result_text, (self.background_panel.pos[0] + 250, self.panel.pos[1] + 20))
         y = self.background_panel.pos[1] + 70
@@ -162,13 +163,6 @@ class UI:
             y = self.add_stats(f"AI {count} ({ai.playstyle})", ai, x, y)
             count += 1
         self.background_panel_visible = True
-
-    def draw_result(self,screen,game_result,player,ai_players):
-        #background = pygame.Surface((1280, 720))
-        #background.set_alpha(180)
-        #background.fill((0, 0, 0))
-        #screen.blit(background, (0, 0))
-        self.open_background_panel(game_result,player,ai_players)
 
     def draw_player_stats(self,player,screen):
         currency_text = self.text_font.render(f"Currency: {player.currency}", True, (255, 255, 255))
@@ -254,40 +248,89 @@ class UI:
             return 3
         return None
 
-    def show_combat(self, combat_log, round_num, max_round, continue_round, skip, can_skip, is_last_round, result_text):
-        self.panel.buttons.clear()
-        self.panel.labels.clear()
-        round_data = combat_log[round_num - 1]
-        phases = round_data["phases"]
-        start_attacker = phases[0]["attacker_before"]
-        start_defender = phases[0]["defender_before"]
-        end_attacker = phases[-1]["attacker_after"]
-        end_defender = phases[-1]["defender_after"]
-
-        self.panel.add_text("Combat", (370, 60))
-        self.panel.add_text(f"Round {round_num} / {max_round}", (370, 90))
-        self.panel.add_text(f"Player units: Infantry - {start_attacker['infantry']} / Tank - {start_attacker['tank']} / Artillery - {start_attacker['artillery']}", (370, 120))
-        self.panel.add_text(f"Enemy units: Infantry - {start_defender['infantry']} / Tank - {start_defender['tank']} / Artillery - {start_defender['artillery']}", (370, 140))
-        y = 170
-        for phase in phases:
-            self.panel.add_text("-" * 70, (390, y))
-            self.panel.add_text(f"{phase['unit_type'].capitalize()} phase", (390, y + 20))
-            self.panel.add_text(f"Attacker damage dealt: {phase['attacker_damage_dealt']}", (410, y + 45))
-            self.panel.add_text(f"Defender damage dealt: {phase['defender_damage_dealt']}", (410, y + 70))
-            y += 100
-        self.panel.add_text(f"Player units: Infantry - {end_attacker['infantry']} / Tank - {end_attacker['tank']} / Artillery - {end_attacker['artillery']}", (370, y + 10))
-        self.panel.add_text(f"Enemy units: Infantry - {end_defender['infantry']} / Tank - {end_defender['tank']} / Artillery - {end_defender['artillery']}", (370, y + 30))
+    def show_combat(self, combat_log, round_num, max_rounds, continue_round, skip, can_skip, can_finish,is_last_round, result_text):
+        self.clear_panel(self.panel)
+        self.sidebar_visible = False
+        left_x = 350
+        right_x = 700
+        self.panel.add_divider(right_x-40,self.panel.pos[1]+60,right_x-40,self.panel.pos[1] + 480)
+        if not combat_log:
+            self.panel.add_text("Territory was undefended - captured instantly", (left_x-20, 160))
+            y = 220
+        else:
+            round_data = combat_log[round_num - 1]
+            phase = round_data["phases"][0]
+            start_attacker = phase["attacker_before"]
+            start_defender = phase["defender_before"]
+            end_attacker = phase["attacker_after"]
+            end_defender = phase["defender_after"]
+            left_x = 350
+            right_x = 700
+            self.panel.add_divider(right_x-40,self.panel.pos[1]+60,right_x-40,self.panel.pos[1] + 480)
+            self.panel.add_text("Combat", (580, 60))
+            self.panel.add_text(f"Round {round_num} / {max_rounds}", (560, 80))
+            # column headers
+            self.panel.add_text("Player", (left_x, 120))
+            self.panel.add_text("Enemy", (right_x, 120))
+            # starting counts
+            self.panel.add_text(f"Infantry: {start_attacker['infantry']}", (left_x, 150))
+            self.panel.add_text(f"Tank: {start_attacker['tank']}", (left_x, 172))
+            self.panel.add_text(f"Artillery: {start_attacker['artillery']}", (left_x, 194))
+            self.panel.add_text(f"Infantry: {start_defender['infantry']}", (right_x, 150))
+            self.panel.add_text(f"Tank: {start_defender['tank']}", (right_x, 172))
+            self.panel.add_text(f"Artillery: {start_defender['artillery']}", (right_x, 194))
+            # attacks this round, per column
+            left_y = 230
+            right_y = 230
+            self.panel.add_text("Attacks", (left_x, left_y))
+            self.panel.add_text("Attacks", (right_x, right_y))
+            left_y += 30
+            right_y += 30
+            attacker_types = phase["attacker_unit_type"]
+            if not attacker_types:
+                self.panel.add_text("no attacks this round", (left_x, left_y))
+                left_y += 25
+            for unit_type in attacker_types:
+                breakdown = phase["attacker_breakdowns"].get(unit_type, {})
+                damage = sum(breakdown.values()) if breakdown else 0
+                self.panel.add_text(f"{unit_type.capitalize()}: {damage:.1f} dmg", (left_x, left_y))
+                left_y += 25
+                for target_type, target_damage in breakdown.items():
+                    self.panel.add_text(f"  -> {target_type.capitalize()}: {target_damage:.1f}", (left_x + 15, left_y))
+                    left_y += 25
+            defender_types = phase["defender_unit_type"]
+            if not defender_types:
+                self.panel.add_text("(none this round)", (right_x, right_y))
+                right_y += 25
+            for unit_type in defender_types:
+                breakdown = phase["defender_breakdowns"].get(unit_type, {})
+                damage = sum(breakdown.values()) if breakdown else 0
+                self.panel.add_text(f"{unit_type.capitalize()}: {damage:.1f} dmg", (right_x, right_y))
+                right_y += 25
+                for target_type, target_damage in breakdown.items():
+                    self.panel.add_text(f"  -> {target_type.capitalize()}: {target_damage:.1f}", (right_x + 15, right_y))
+                    right_y += 25
+            y = max(left_y,right_y) + 25
+            # remaining units
+            self.panel.add_text(f"Infantry {end_attacker['infantry']} / Tank {end_attacker['tank']} / Artillery {end_attacker['artillery']}", (left_x-10, y))
+            self.panel.add_text(f"Infantry {end_defender['infantry']} / Tank {end_defender['tank']} / Artillery {end_defender['artillery']}", (right_x-10, y))
+            y += 40
+        self.panel.add_divider(right_x-40,self.panel.pos[1]+60,right_x-40,y)
         if is_last_round and result_text:
-            self.panel.add_text(f"Result: {result_text}", (590, 60))
-        continue_label = "FINISH" if is_last_round else "CONTINUE"
-        self.panel.add_button(continue_label, (430, y + 90), continue_round)
+            self.panel.add_text(f"Result: {result_text}", (700, y+40))
+        if is_last_round:
+            continue_label = "FINISH" if can_finish else "FINISH (locked)"
+            continue_action = continue_round if can_finish else None
+        else:
+            continue_label = "CONTINUE"
+            continue_action = continue_round
+        self.panel.add_button(continue_label,(420, y + 50),continue_action)
         if not is_last_round:
             skip_label = "SKIP" if can_skip else "SKIP (locked)"
-            self.panel.add_button(skip_label, (630, y + 90), skip if can_skip else None)
-
+            self.panel.add_button(skip_label, (570, y+50), skip if can_skip else None)
         self.open_panel()
-        
-    def draw(self,screen,map_display,state,selected_country,player,ai_players,game_result):
+    
+    def draw(self,screen,map_display,state,player,ai_players,game_result):
         screen.fill((0, 0, 0))
         if state == "map_selection":
             self.draw_map_selection(screen)
@@ -307,4 +350,4 @@ class UI:
         if self.player_sidebar_visible:
             self.player_sidebar.draw(screen)
         if state == "game_over":
-           self.draw_result(screen, game_result,player,ai_players)
+           self.open_background_panel(game_result,player,ai_players)

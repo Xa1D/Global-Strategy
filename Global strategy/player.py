@@ -12,6 +12,8 @@ class Player:
         self.start_time = pygame.time.get_ticks()
         self.last_income_time = pygame.time.get_ticks()
         self.last_action = "idle"
+        self.last_order_change = 0
+        self.order_cooldown = 20000
         self.attacks_made = 0
         self.attacks_won = 0
         self.attacks_lost = 0
@@ -23,7 +25,6 @@ class Player:
         self.currency_spent = 0
         self.peak_territories = 1
         self.territories_at_2min = None
-
 
     def apply_attack_result(self, result, attacker_units_before, defender_units_before, defender_owner):
         cooldown_time = 9000

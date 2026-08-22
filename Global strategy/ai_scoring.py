@@ -1,5 +1,4 @@
 import numpy as np
-import pygame
 from combat import VALUE_WEIGHTS
 from combat import STATS    
 PLAYSTYLE_WEIGHTS = {"aggressive": np.array([0.35, 0.35, 0.15, 0.15]),"defensive":  np.array([0.20, 0.20, 0.25, 0.35]),"balanced":np.array([0.25, 0.25, 0.25, 0.25])}
@@ -127,22 +126,22 @@ def expansion_advantage(player, world, enemies):
     neutral_proximity = clamp(neutral_strength(player, world, enemies) / map_strength)
     return clamp(0.5 + (my_strength - neutral_proximity))
 
-def redistribution_need(player):
+def redistribution_score(player):
     territories = player.territories
     if len(territories) < 2:
         return 0.0
-    counts = [territory.total_units() for territory in territories]
-    avg = sum(counts) / len(counts)
-    if avg <= 0:
+    unit_counts = [territory.total_units() for territory in territories]
+    average = sum(unit_counts) / len(unit_counts)
+    if average <= 0:
         return 0.0
-    variance = sum(abs(count - avg) for count in counts) / len(counts)
-    return clamp(variance / (avg + 1))
+    unit_difference = sum(abs(count - average) for count in unit_counts) / len(unit_counts)
+    return clamp(unit_difference / (average + 1))
 
 def reinforcing_score(player):
-    imbalance = redistribution_need(player)
+    imbalance = redistribution_score(player)
     afford_infantry = unit_cost("infantry")
-    cant_afford = 1.0 if player.currency < afford_infantry else 0.3
-    return clamp(imbalance * cant_afford)
+    multiplier = 1.0 if player.currency < afford_infantry * 2 else 0.4
+    return clamp(imbalance * multiplier)
 
 def has_neutral_neighbour(player, world, enemies):
     for country in player.territories:
@@ -173,12 +172,12 @@ def weakest_territory_threat(player, enemies, world):
                 best_threat = t
                 best_country = country
     if best_country is None:
-        return None, 1.0, 1.0
+        return None, 1.0
     return best_country, best_threat
 
 def choose_state(state_scores):
     states = list(state_scores.keys())
-    scores = np.array([max(state_scores[s], 0.0) for s in states])
+    scores = np.array([max(state_scores[state], 0.0) for state in states])
     if scores.sum() <= 0:
         return "idle"
     probabilities = scores / scores.sum()
@@ -193,20 +192,22 @@ def purchase_priority(player, world, enemies):
     for country in player.territories:
         if country.combat:
             continue
-        threat = min((threat_score(country, world, e, n) for e in enemies),default=1.0,)
+        threat = min((threat_score(country, world, enemy, n) for enemy in enemies), default=1.0)
         danger = 1 - threat
-        neutral_adjacent = any(world.countries[name] not in player.territories
-            and not any(world.countries[name] in e.territories for e in enemies) for name in country.adjacent)
-        priority = danger + (0.3 if neutral_adjacent else 0.0)
+        neutral_adjacent = sum(1 for name in country.adjacent if world.countries[name] not in player.territories
+                        and not any(world.countries[name] in enemy.territories for enemy in enemies))
+        priority = danger + (0.1 * neutral_adjacent)
         scored.append((priority, country, danger))
-    scored.sort(key=lambda triple: triple[0], reverse=True)
-    return [(country, danger) for _, country, danger in scored]   
+    def get_priority(score):
+        return score[0]
+    scored.sort(key=get_priority, reverse=True)
+    return [(country, danger) for priority, country, danger in scored]   
 
 def path_bonus(country, path_countries):
     return 0.15 if country.name in path_countries else 0.0
 
 def new_transition_matrix():
-    return {s: {s2: BASE_COUNT for s2 in STATES} for s in STATES}
+    return {state: {state_2: BASE_COUNT for state_2 in STATES} for state in STATES}
 
 def record_transition(matrix, from_state, to_state):
     if from_state in matrix and to_state in matrix[from_state]:
@@ -214,15 +215,14 @@ def record_transition(matrix, from_state, to_state):
 
 def predict_next_state(matrix, current_state):
     if current_state not in matrix:
-        return {s: 1 / len(STATES) for s in STATES}
+        return {state: 1 / len(STATES) for state in STATES}
     row = matrix[current_state]
     total = sum(row.values())
     if total <= 0:
-        return {s: 1 / len(STATES) for s in STATES}
-    return {s: count / total for s, count in row.items()}
+        return {state: 1 / len(STATES) for state in STATES}
+    return {state: count / total for state, count in row.items()}
 
 def neighbouring_enemies(player, world, enemies):
-    """Enemies who own at least one territory adjacent to this player's territories."""
     result = []
     for enemy in enemies:
         for country in player.territories:

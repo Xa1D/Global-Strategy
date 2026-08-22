@@ -1,7 +1,7 @@
 import pygame
 from shapely.geometry import Point
 from GUI import Camera
-from Territory import Territory
+from territory import Territory
 import json
 
 class Map:

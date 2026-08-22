@@ -8,6 +8,9 @@ class MoveManager:
         self.move_text, self.move_text_time = None, 0
 
     def enter_move(self):
+        if len(self.game.player.territories) <= 1:
+            self.show_message("Cannot move units with only 1 country")
+            return
         if self.game.selected_country in self.game.player.territories:
             self.game.state = "moving"
             self.move_from = self.game.selected_country
@@ -20,7 +23,7 @@ class MoveManager:
             if clicked_country in self.game.player.territories:
                 if clicked_country.name in self.move_from.adjacent:
                     if clicked_country.combat:
-                        self.game.combat_manager.show_blocked_message("Country in combat")
+                        self.show_message("Country in combat")
                         return
                     self.move_to = clicked_country
                     self.game.UI.remove_highlight(self.game.map)
@@ -28,7 +31,11 @@ class MoveManager:
                     self.game.UI.panel_visible = True
 
     def refresh_panel(self):
-        self.game.UI.open_move_info(self.move_from, self.count, self.adjust, self.confirm_move, self.cancel_move)
+        self.game.UI.open_move_info(self.move_from, self.count, self.adjust, self.confirm_move, self.finish_move)
+
+    def show_message(self, text):
+        self.move_text = text
+        self.move_text_time = pygame.time.get_ticks()
 
     def adjust(self, unit_type, delta):
         max_amount = self.move_from.units.get(unit_type, 0)

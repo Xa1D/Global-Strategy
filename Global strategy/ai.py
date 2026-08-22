@@ -151,12 +151,10 @@ class AI(Player):
                 neighbour = world.countries[name]
                 if neighbour in self.territories or neighbour.combat:
                     continue
-                if any(neighbour in e.territories for e in enemies):
-                    continue  # owned by an enemy, not neutral - that's attacking's job
+                if any(neighbour in enemy.territories for enemy in enemies):
+                    continue  
                 if neighbour.attack_cooldown > current_time:
                     continue
-                # score against no specific enemy - use a neutral "phantom" comparison:
-                # treat threat_score as 1.0 (no enemy adjacency risk from this target)
                 score = (ai_scoring.count_ratio_score(country, neighbour) + ai_scoring.value_ratio_score(country, neighbour)) / 2
                 score += ai_scoring.path_bonus(neighbour, path_countries)
                 if score > best_score:
@@ -165,17 +163,19 @@ class AI(Player):
         return best, best_score
 
     def update_ai(self, world, player, ai_players):
-         current_time = pygame.time.get_ticks()
-         enemies = [p for p in ([player] + ai_players) if p is not self]
-         if self.state == "attacking":
+        if not self.territories:
+            return
+        current_time = pygame.time.get_ticks()
+        enemies = [enemy for enemy in ([player] + ai_players) if enemy is not self]
+        if self.state == "attacking":
             if current_time - self.last_attack >= self.attack_duration:
                 self.attack()
                 self.attacking_country.combat, self.defending_country.combat = False, False
                 self.state = "idle"
                 self.next_action = current_time + self.delay
             return
-         if current_time >= self.next_action:
-            self.evaluate_state(world, enemies)
+        if current_time >= self.next_action:
+            self.execute_actions(world, enemies)
             if self.state != "attacking":
                 self.next_action += self.delay 
 
@@ -255,13 +255,15 @@ class AI(Player):
             "reinforcing": min(ai_scoring.reinforcing_score(self) + global_aggressive * 0.2, 1.0) if can_reinforce else 0.0,
             "idle": 0.1,}
         chosen = ai_scoring.choose_state(state_scores)
+        print(f"{state_scores} chosen state: {chosen}")
         return chosen,weak_country
 
-    def execute_actions(self,state,world,enemies):
+    def execute_actions(self,world,enemies):
         self.purchase_units(world, enemies)
-        self.last_action, weak_country = self.evaluate_state(world,enemies)
+        state, weak_country = self.evaluate_state(world,enemies)
+        self.last_action = state
         path = self.get_target_path(world)
-        path_countries = {c.name for c in path} if path else set()
+        path_countries = {country.name for country in path} if path else set()
         if state == "attacking":
             pair, _ = self.best_attack_target(world, enemies[0], path_countries)
             if pair:
