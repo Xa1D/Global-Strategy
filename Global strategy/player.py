@@ -12,8 +12,6 @@ class Player:
         self.start_time = pygame.time.get_ticks()
         self.last_income_time = pygame.time.get_ticks()
         self.last_action = "idle"
-        self.last_order_change = 0
-        self.order_cooldown = 20000
         self.attacks_made = 0
         self.attacks_won = 0
         self.attacks_lost = 0

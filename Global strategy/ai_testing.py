@@ -321,7 +321,6 @@ def run_ai_simulation(cycles=40, verbose=True):
     player = Player(player_country)
     ai_1 = AI(ai_1_country, playstyle="aggressive", offset=0)
     ai_2 = AI(ai_2_country, playstyle="defensive", offset=1500)
-
     ai_players = [ai_1, ai_2]
 
     state_log = {ai_1.country.name: [], ai_2.country.name: []}

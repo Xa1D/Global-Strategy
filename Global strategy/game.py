@@ -4,6 +4,7 @@ from shapely.geometry import Point
 from player import Player
 from ai import AI
 from ui import UI
+from combat import STATS
 from CombatManager import CombatManager
 from MoveManager import MoveManager
 
@@ -34,6 +35,8 @@ class Game:
         self.selected_country, self.attacking_country = None, None
         self.last_income_time = pygame.time.get_ticks()
 
+        self.purchase_amounts = {"infantry": 1, "tank": 1, "artillery": 1}
+
         self.game_result = None
         self.state = "setup"
 
@@ -46,27 +49,45 @@ class Game:
             ai.next_action += paused_duration
             ai.last_attack += paused_duration
 
+    def adjust_buy_amount(self, unit_type, delta):
+        cost = STATS[unit_type]["cost"]
+        max_affordable = max(self.player.currency // cost, 1)
+        new_value = self.purchase_amounts[unit_type] + delta
+        new_value = max(1, min(new_value, max_affordable))
+        self.purchase_amounts[unit_type] = new_value
+        self.refresh_buy_panel()
+
+    def attempt_buy(self, unit_type):
+        amount = self.purchase_amounts[unit_type]
+        cost = STATS[unit_type]["cost"] * amount
+        if self.player.currency < cost:
+            self.move_manager.show_message("Cannot afford units")
+            return
+        self.player.buy_units(self.selected_country, unit_type, amount)
+        self.UI.update_sidebar(self.selected_country, self.player, self.update_unit_panel, self.combat_manager.enter_attack, self.move_manager.enter_move)
+        self.refresh_buy_panel()
+
+    def refresh_buy_panel(self):
+        self.UI.open_buy_panel(self.purchase_amounts, self.adjust_buy_amount,self.buy_infantry_country, self.buy_tank_country, self.buy_artillery_country)
+
     def buy_infantry_country(self):
         if self.selected_country:
-            self.player.buy_units(self.selected_country, "infantry")
-            self.UI.update_sidebar(self.selected_country, self.player, self.update_unit_panel, self.combat_manager.enter_attack, self.move_manager.enter_move)
+            self.attempt_buy("infantry")
 
     def buy_tank_country(self):
         if self.selected_country:
-            self.player.buy_units(self.selected_country, "tank")
-            self.UI.update_sidebar(self.selected_country, self.player, self.update_unit_panel, self.combat_manager.enter_attack, self.move_manager.enter_move)
+            self.attempt_buy("tank")
 
     def buy_artillery_country(self):
         if self.selected_country:
-            self.player.buy_units(self.selected_country, "artillery")
-            self.UI.update_sidebar(self.selected_country, self.player, self.update_unit_panel, self.combat_manager.enter_attack, self.move_manager.enter_move)
+            self.attempt_buy("artillery")
             
     def update_unit_panel(self):
         if self.selected_country and self.selected_country.combat:
             self.combat_manager.show_message("Country in combat")
             return
         self.UI.panel_visible = True
-        self.UI.open_units_info(self.buy_infantry_country, self.buy_tank_country, self.buy_artillery_country)
+        self.refresh_buy_panel()
         self.UI.update_sidebar(self.selected_country, self.player, self.update_unit_panel, self.combat_manager.enter_attack, self.move_manager.enter_move)
 
 #game ends when player captures all territories or loses all territories

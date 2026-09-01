@@ -6,7 +6,6 @@ STATS = {"infantry": {"attack": 2,  "health": 2, "cost": 5, "miss": 0.2,"cooldow
 
 VALUE_WEIGHTS = {"infantry": 1.0, "tank": 1.5, "artillery": 2.0}
 
-
 class Combat:
     def __init__(self, attacker, defender):
         self.attacker = attacker
@@ -36,24 +35,17 @@ class Combat:
             "artillery": player.units.get("artillery", 0)}
 
     def simulate_combat(self):
-        if not self.units_left(self.defender):
-            return "attacker"  
         round_number = 1
-        while self.units_left(self.attacker) and self.units_left(self.defender): #while both sides still have units loops through the combat rounds
-            round = self.simulate_round(round_number)
-            self.combat_log.append(round)
-            for phase in round["phases"]:
-                attacker_alive = self.units_left(self.attacker)
-                defender_alive = self.units_left(self.defender)
-                if not attacker_alive and not defender_alive:
-                    attacker_damage = phase["attacker_damage_dealt"]
-                    defender_damage = phase["defender_damage_dealt"]
-                    if attacker_damage > defender_damage:
-                        return "attacker"
-                    elif defender_damage > attacker_damage:
-                        return "defender"
-                    else:
-                        return "defender"
+        while self.units_left(self.attacker) and self.units_left(self.defender):
+            attacker_hp_before = sum(sum(hp) for hp in self.attacker_hp.values())
+            defender_hp_before = sum(sum(hp) for hp in self.defender_hp.values())
+            round_data = self.simulate_round(round_number)
+            self.combat_log.append(round_data)
+            for phase in round_data["phases"]:
+                if not self.units_left(self.attacker) and not self.units_left(self.defender):
+                    attacker_extra_damage = phase["attacker_damage_dealt"] - defender_hp_before
+                    defender_extra_damage = phase["defender_damage_dealt"] - attacker_hp_before
+                    return "attacker" if attacker_extra_damage >= defender_extra_damage else "defender"
             round_number += 1
         if self.units_left(self.attacker) and not self.units_left(self.defender):
             return "attacker"

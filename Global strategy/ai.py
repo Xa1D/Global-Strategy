@@ -1,5 +1,5 @@
 from player import Player
-import ai_scoring
+from ai_scoring import AIScoring
 import pygame
 from combat import Combat, VALUE_WEIGHTS
 
@@ -12,7 +12,7 @@ class AI(Player):
         self.last_attack = 0
         self.state = "idle"
         self.next_action = pygame.time.get_ticks() + offset
-        self.threshold = 0.3 if playstyle == "aggressive" else 0.5
+        self.scorer = AIScoring(self,playstyle)
         self.opponent_matrices = {}
         self.last_observed_action = {}
 
@@ -20,11 +20,11 @@ class AI(Player):
         for opponent in enemies:
             current_action = opponent.last_action
             if opponent not in self.opponent_matrices:
-                self.opponent_matrices[opponent] = ai_scoring.new_transition_matrix()
+                self.opponent_matrices[opponent] = self.scorer.new_transition_matrix()
             last_action = self.last_observed_action.get(opponent)
             if last_action is not None and last_action != current_action:
                 print(f"[MARKOV] {self.country.name} observed {opponent.country.name}: {last_action} -> {current_action}")
-                ai_scoring.record_transition(self.opponent_matrices[opponent], last_action, current_action)
+                self.scorer.record_transition(self.opponent_matrices[opponent], last_action, current_action)
             self.last_observed_action[opponent] = current_action
 
     def attack(self):
@@ -37,24 +37,24 @@ class AI(Player):
         result = battle.simulate_combat()
         return self.apply_attack_result(result, attacker_before, defender_before, defender_owner)
 
-    def predicted_local_posture(self, world, enemies):
-        local_enemies = ai_scoring.neighbouring_enemies(self, world, enemies)
-        if not local_enemies:
-            return 0.5, 0.5  # no adjacent enemies, no data - neutral
+    def predicted_local_states(self, world, enemies):
+        neighbouring_enemies = self.scorer.neighbouring_enemies(world, enemies)
+        if not neighbouring_enemies:
+            return 0.5, 0.5 
         passive_total, aggressive_total, count = 0.0, 0.0, 0
-        for opponent in local_enemies:
+        for opponent in neighbouring_enemies:
             matrix = self.opponent_matrices.get(opponent)
             if matrix is None:
                 continue
-            pred = ai_scoring.predict_next_state(matrix, opponent.last_action)
-            passive_total += pred.get("defending", 0) + pred.get("reinforcing", 0) + pred.get("idle", 0)
-            aggressive_total += pred.get("attacking", 0) + pred.get("expanding", 0)
+            predicted_state = self.scorer.predict_next_state(matrix, opponent.last_action)
+            passive_total += predicted_state.get("defending", 0) + predicted_state.get("reinforcing", 0) + predicted_state.get("idle", 0)
+            aggressive_total += predicted_state.get("attacking", 0) + predicted_state.get("expanding", 0)
             count += 1
         if count == 0:
             return 0.5, 0.5
         return passive_total / count, aggressive_total / count
 
-    def predicted_global_posture(self, enemies):
+    def predicted_global_states(self, enemies):
         if not enemies:
             return 0.5, 0.5
         passive_total, aggressive_total, count = 0.0, 0.0, 0
@@ -62,9 +62,9 @@ class AI(Player):
             matrix = self.opponent_matrices.get(opponent)
             if matrix is None:
                 continue
-            pred = ai_scoring.predict_next_state(matrix, opponent.last_action)
-            passive_total += pred.get("defending", 0) + pred.get("reinforcing", 0) + pred.get("idle", 0)
-            aggressive_total += pred.get("attacking", 0) + pred.get("expanding", 0)
+            predicted_state = self.scorer.predict_next_state(matrix, opponent.last_action)
+            passive_total += predicted_state.get("defending", 0) + predicted_state.get("reinforcing", 0) + predicted_state.get("idle", 0)
+            aggressive_total += predicted_state.get("attacking", 0) + predicted_state.get("expanding", 0)
             count += 1
         if count == 0:
             return 0.5, 0.5
@@ -78,7 +78,7 @@ class AI(Player):
             value = country.unit_value(VALUE_WEIGHTS) + len(country.adjacent) * 2
             candidates.append((value, country))
         candidates.sort(key=lambda pair: pair[0], reverse=True)
-        return [country for _, country in candidates[:count]]
+        return [country for value, country in candidates[:count]]
 
     def search(self, start, target, world):
         queue = [start]
@@ -122,7 +122,7 @@ class AI(Player):
                     best_path = path
         return best_path
 
-    def best_attack_target(self, world, enemy, path_countries ):
+    def best_attack_target(self, world, enemies, path_countries):
         best, best_score = None, -1
         current_time = pygame.time.get_ticks()
         for country in self.territories:
@@ -130,12 +130,13 @@ class AI(Player):
                 continue
             for name in country.adjacent:
                 neighbour = world.countries[name]
-                if neighbour not in enemy.territories or neighbour.combat:
+                owner = next((e for e in enemies if neighbour in e.territories), None)
+                if owner is None or neighbour.combat:
                     continue
                 if neighbour.attack_cooldown > current_time:
                     continue
-                score = ai_scoring.score_country(country, neighbour, world, self, enemy, self.playstyle)
-                score += ai_scoring.path_bonus(neighbour, path_countries)
+                score = self.scorer.score_country(country, neighbour, world, owner)
+                score += self.scorer.path_bonus(neighbour, path_countries)
                 if score > best_score:
                     best_score = score
                     best = (country, neighbour)
@@ -155,8 +156,8 @@ class AI(Player):
                     continue  
                 if neighbour.attack_cooldown > current_time:
                     continue
-                score = (ai_scoring.count_ratio_score(country, neighbour) + ai_scoring.value_ratio_score(country, neighbour)) / 2
-                score += ai_scoring.path_bonus(neighbour, path_countries)
+                score = (self.scorer.count_ratio_score(country, neighbour) + self.scorer.value_ratio_score(country, neighbour)) / 2
+                score += self.scorer.path_bonus(neighbour, path_countries)
                 if score > best_score:
                     best_score = score
                     best = (country, neighbour)
@@ -202,10 +203,10 @@ class AI(Player):
 
 
     def purchase_units(self, world, enemies):
-        infantry_cost = ai_scoring.unit_cost("infantry")
-        tank_cost = ai_scoring.unit_cost("tank")
-        artillery_cost = ai_scoring.unit_cost("artillery")
-        scored = ai_scoring.purchase_priority(self,world, enemies)
+        infantry_cost = self.scorer.unit_cost("infantry")
+        tank_cost = self.scorer.unit_cost("tank")
+        artillery_cost = self.scorer.unit_cost("artillery")
+        scored = self.scorer.purchase_priority(world, enemies)
         if not scored:
             return
         current_time = pygame.time.get_ticks()
@@ -228,7 +229,7 @@ class AI(Player):
                 if self.currency < infantry_cost:
                     break
                 type_budget = country_budget * fraction
-                cost = ai_scoring.unit_cost(unit_type)
+                cost = self.scorer.unit_cost(unit_type)
                 amount = int(type_budget // cost)
                 amount = min(amount, self.currency // cost)
                 if amount > 0:
@@ -239,22 +240,25 @@ class AI(Player):
     def evaluate_state(self, world, enemies):
         self.observe_opponents(enemies)
         self.purchase_units(world, enemies)
-        strength_advantage = ai_scoring.strength_advantage(self, enemies, world)
-        expansion_advantage = ai_scoring.expansion_advantage(self, world, enemies)
-        can_expand = ai_scoring.has_neutral_neighbour(self, world, enemies) and not ai_scoring.check_empty_territory(self)
-        can_attack = ai_scoring.has_enemy_neighbour(self, world, enemies) and not ai_scoring.check_empty_territory(self)
-        weak_country, threat = ai_scoring.weakest_territory_threat(self, enemies, world)
+        strength_advantage = self.scorer.strength_advantage(enemies, world)
+        expansion_advantage = self.scorer.expansion_advantage(world, enemies)
+        can_expand = self.scorer.has_neutral_neighbour(world, enemies) and not self.scorer.check_empty_territory()
+        can_attack = self.scorer.has_enemy_neighbour(world, enemies) and not self.scorer.check_empty_territory()
+        weak_country, threat = self.scorer.weakest_territory_threat(enemies, world)
         danger = 1 - threat
         can_defend = weak_country is not None and any(world.countries[name] in self.territories for name in weak_country.adjacent)
         can_reinforce = len(self.territories) >= 2
-        local_passive, local_aggressive = self.predicted_local_posture(world, enemies)
-        global_passive, global_aggressive = self.predicted_global_posture(enemies)
-        state_scores = {"attacking": (strength_advantage + local_passive * 0.2) if can_attack else 0.0,
-            "expanding": (expansion_advantage + global_passive * 0.15) if can_expand else 0.0,
-            "defending": min(danger + local_aggressive * 0.3, 1.0) if can_defend else 0.0,
-            "reinforcing": min(ai_scoring.reinforcing_score(self) + global_aggressive * 0.2, 1.0) if can_reinforce else 0.0,
-            "idle": 0.1,}
-        chosen = ai_scoring.choose_state(state_scores)
+        local_passive, local_aggressive = self.predicted_local_states(world, enemies)
+        global_passive, global_aggressive = self.predicted_global_states(enemies)
+        state_scores = {
+            "attacking": min(strength_advantage + local_passive * 0.25, 1.0) if can_attack else 0.0,
+            "expanding": min(expansion_advantage + global_passive * 0.25, 1.0) if can_expand else 0.0,
+            "defending": min(danger + local_aggressive * 0.25, 1.0) if can_defend else 0.0,
+            "reinforcing": min(self.scorer.reinforcing_score() + global_aggressive * 0.25, 1.0) if can_reinforce else 0.0,
+            "idle": 0.1,
+            }
+        state_scores = self.scorer.apply_playstyle_weights(state_scores)
+        chosen = self.scorer.choose_state(state_scores)
         print(f"{state_scores} chosen state: {chosen}")
         return chosen,weak_country
 
@@ -265,7 +269,7 @@ class AI(Player):
         path = self.get_target_path(world)
         path_countries = {country.name for country in path} if path else set()
         if state == "attacking":
-            pair, _ = self.best_attack_target(world, enemies[0], path_countries)
+            pair, _ = self.best_attack_target(world, enemies, path_countries)
             if pair:
                 self.start_attack(*pair)
                 print(f"[ATTACK] state after start_attack: {self.state}")
@@ -318,11 +322,11 @@ class AI(Player):
             amount = best_units // 2
             self.split_move(best_source, target, amount)
 
-    def split_move(self, source, dest, amount):
-        total = source.total_units()
+    def split_move(self, original_country, selected_country, amount):
+        total = original_country.total_units()
         if total <= 0 or amount <= 0:
             return
-        infantry = min(source.units.get("infantry", 0), (amount * source.units.get("infantry", 0)) // total)
-        tank = min(source.units.get("tank", 0), (amount * source.units.get("tank", 0)) // total)
-        artillery = min(source.units.get("artillery", 0), (amount * source.units.get("artillery", 0)) // total)
-        super().move_units(source, dest, infantry, tank, artillery)
+        infantry = min(original_country.units.get("infantry", 0), (amount * original_country.units.get("infantry", 0)) // total)
+        tank = min(original_country.units.get("tank", 0), (amount * original_country.units.get("tank", 0)) // total)
+        artillery = min(original_country.units.get("artillery", 0), (amount * original_country.units.get("artillery", 0)) // total)
+        super().move_units(original_country, selected_country, infantry, tank, artillery)

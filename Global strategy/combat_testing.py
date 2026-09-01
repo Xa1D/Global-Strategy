@@ -73,3 +73,21 @@ run_matchup(
     {"infantry": 40, "tank": 20, "artillery": 20},
     trials=TRIALS,
 )
+
+
+def test_expected_damage_output():
+    print("\nDAMAGE OUTPUT VALIDATION")
+    from combat import Combat, STATS
+    trials = 5000
+    for unit_type in ["infantry", "tank", "artillery"]:
+        count = 20
+        total = 0
+        for _ in range(trials):
+            total += Combat.get_damage(None, unit_type, count)
+        avg = total / trials
+        expected = STATS[unit_type]["attack"] * (1 - STATS[unit_type]["miss"]) * count
+        print(f"{unit_type}: avg={avg:.2f}, expected≈{expected:.2f}")
+        assert abs(avg - expected) / expected < 0.05, f"FAILED: {unit_type} damage output off by more than 5%"
+    print("PASSED: damage output matches theoretical expectation.")
+
+test_expected_damage_output()

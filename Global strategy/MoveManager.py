@@ -31,7 +31,7 @@ class MoveManager:
                     self.game.UI.panel_visible = True
 
     def refresh_panel(self):
-        self.game.UI.open_move_info(self.move_from, self.count, self.adjust, self.confirm_move, self.finish_move)
+        self.game.UI.open_move_panel(self.move_from, self.count, self.adjust, self.confirm_move, self.finish_move)
 
     def show_message(self, text):
         self.move_text = text

@@ -112,7 +112,7 @@ class UI:
     def open_panel(self):
         self.panel_visible = True
 
-    def open_move_info(self, move_from, count, adjust, confirm, cancel):
+    def open_move_panel(self, move_from, count, adjust, confirm, cancel):
         self.clear_panel(self.panel)
         self.panel.add_text("Select amount and type of units to move", (370, 60))
 
@@ -131,21 +131,34 @@ class UI:
         self.panel.add_button("Confirm Move", (450, 460), confirm)
         self.panel.add_button("Cancel", (600, 460), cancel)
 
-    def open_units_info(self,buy_infantry,buy_tank,buy_artillery):
+    def open_buy_panel(self, amounts, adjust, buy_infantry, buy_tank, buy_artillery):
         self.clear_panel(self.panel)
-        self.panel.add_text("Select type of unit to buy:", (400, 60))
-        self.panel.add_button("Buy Infantry  (5) ", (480, 150), buy_infantry)
-        self.panel.add_button("Buy Tank      (15)", (480, 230), buy_tank)
-        self.panel.add_button("Buy Artillery (20)", (480, 310), buy_artillery)
-        self.panel.add_button("Back              ", (480, 410), self.close_panel)
+        self.panel.add_text("Select amount and type of unit to buy:", (370, 60))
 
-    def add_stats(self,label, p, x, y):
-        lines = [f"{label}: {len(p.territories)} territories (peak {p.peak_territories})",
-            f"  2-min territories: {p.territories_at_2min if p.territories_at_2min is not None else 'N/A'}",
-            f"  Attacks made: {p.attacks_made} ({p.attacks_won}W / {p.attacks_lost}L)",
-            f"  Defended: {p.times_defended} held / {p.times_conquered} lost",
-            f"  Units lost - attacking: {p.units_lost}, defending: {p.units_lost_defending}",
-            f"  Currency earned/spent: {p.currency_earned} / {p.currency_spent}",]
+        self.panel.add_text(f"Infantry (5 each): {amounts['infantry']}", (390, 140))
+        self.panel.add_button("+", (620, 140), lambda: adjust("infantry", 1))
+        self.panel.add_button("-", (660, 140), lambda: adjust("infantry", -1))
+        self.panel.add_button("Buy Infantry", (470, 200), buy_infantry)
+
+        self.panel.add_text(f"Tank (10 each): {amounts['tank']}", (390, 230))
+        self.panel.add_button("+", (620, 230), lambda: adjust("tank", 1))
+        self.panel.add_button("-", (660, 230), lambda: adjust("tank", -1))
+        self.panel.add_button("Buy Tank", (470, 290), buy_tank)
+
+        self.panel.add_text(f"Artillery (15 each): {amounts['artillery']}", (390, 320))
+        self.panel.add_button("+", (620, 320), lambda: adjust("artillery", 1))
+        self.panel.add_button("-", (660, 320), lambda: adjust("artillery", -1))
+        self.panel.add_button("Buy Artillery", (470, 380), buy_artillery)
+
+        self.panel.add_button("Back", (480, 480), self.close_panel)
+
+    def add_stats(self,label, player,x,y):
+        lines = [f"{label}: {len(player.territories)} territories (peak {player.peak_territories})",
+            f"  2-min territories: {player.territories_at_2min if player.territories_at_2min is not None else 'N/A'}",
+            f"  Attacks made: {player.attacks_made} ({player.attacks_won}W / {player.attacks_lost}L)",
+            f"  Defended: {player.times_defended} held / {player.times_conquered} lost",
+            f"  Units lost - attacking: {player.units_lost}, defending: {player.units_lost_defending}",
+            f"  Currency earned/spent: {player.currency_earned} / {player.currency_spent}",]
         for line in lines:
             self.background_panel.add_text(line, (x, y))
             y += 20
@@ -157,10 +170,10 @@ class UI:
         self.background_panel.add_text(result_text, (self.background_panel.pos[0] + 250, self.panel.pos[1] + 20))
         y = self.background_panel.pos[1] + 70
         x = self.background_panel.pos[0] + 30
-        y = self.add_stats("Player", player, x, y)
+        y = self.add_stats("Player", player,x,y)
         count = 1
         for ai in ai_players:
-            y = self.add_stats(f"AI {count} ({ai.playstyle})", ai, x, y)
+            y = self.add_stats(f"AI {count} ({ai.playstyle})", ai,x,y)
             count += 1
         self.background_panel_visible = True
 
@@ -200,7 +213,7 @@ class UI:
             return "Africa"
         return None 
  
-    def draw_pause(self,screen):
+    def draw_pause_screen(self,screen):
         screen.fill("black")
         text = self.menu_font.render("PAUSED", True, "white")
         screen.blit(text, text.get_rect(center=(640, 150)))

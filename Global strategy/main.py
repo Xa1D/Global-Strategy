@@ -72,7 +72,7 @@ def main():
             game.update(events)
             game.draw()
         elif state == "paused":
-            ui.draw_pause(screen)
+            ui.draw_pause_screen(screen)
         clock.tick(60)
         pygame.display.update()
 
