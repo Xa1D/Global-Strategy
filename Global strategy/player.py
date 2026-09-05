@@ -2,11 +2,11 @@ import pygame
 from combat import STATS
 
 class Player:
-    def __init__(self, country):
-        self.country = country
-        country.owner = self
-        self.territories = [country] 
-        self.attacking_country, self.defending_country = None, None
+    def __init__(self, territory):
+        self.territory = territory
+        territory.owner = self
+        self.territories = [territory] 
+        self.attacking_territory, self.defending_territory = None, None
         self.currency = 50
         self.income = 1
         self.start_time = pygame.time.get_ticks()
@@ -27,23 +27,23 @@ class Player:
     def apply_attack_result(self, result, attacker_units_before, defender_units_before, defender_owner):
         cooldown_time = 9000
         current_time = pygame.time.get_ticks()
-        attacker_units_after = self.attacking_country.total_units()
-        defender_units_after = self.defending_country.total_units()
+        attacker_units_after = self.attacking_territory.total_units()
+        defender_units_after = self.defending_territory.total_units()
         self.attacks_made += 1
         self.units_lost += max(attacker_units_before - attacker_units_after, 0)
         if defender_owner:
             defender_owner.units_lost_defending += max(defender_units_before - defender_units_after, 0)
-        self.attacking_country.attack_cooldown = current_time + cooldown_time
-        self.defending_country.attack_cooldown = current_time + cooldown_time
+        self.attacking_territory.attack_cooldown = current_time + cooldown_time
+        self.defending_territory.attack_cooldown = current_time + cooldown_time
         if result == "attacker":
             self.attacks_won += 1
             if defender_owner:
                 defender_owner.times_conquered += 1
-                if self.defending_country in defender_owner.territories:
-                    defender_owner.territories.remove(self.defending_country)
-            self.defending_country.owner = self
-            if self.defending_country not in self.territories:
-                self.territories.append(self.defending_country)
+                if self.defending_territory in defender_owner.territories:
+                    defender_owner.territories.remove(self.defending_territory)
+            self.defending_territory.owner = self
+            if self.defending_territory not in self.territories:
+                self.territories.append(self.defending_territory)
             self.peak_territories = max(self.peak_territories, len(self.territories))
             return "win"
         else:
@@ -52,13 +52,13 @@ class Player:
                 defender_owner.times_defended += 1
             return "lose"
           
-    def buy_units(self, country,type,amount=1):
-        if country in self.territories and not country.combat:
+    def buy_units(self, territory,type, amount=1):
+        if territory in self.territories and not territory.combat:
             cost = STATS[type]["cost"] * amount
             if self.currency >= cost:
                 self.currency -= cost
                 self.currency_spent += cost
-                country.units[type] = country.units.get(type, 0) + amount
+                territory.units[type] = territory.units.get(type, 0) + amount
 
     def update(self):
         self.update_income()
@@ -71,19 +71,19 @@ class Player:
             self.currency_earned += self.income
             self.last_income_time = current_time
 
-#moves the amount of units from original to selected country
-#if amount is too great then 1 - country units is moved from min function
-    def move_units(self, original_country, selected_country, infantry_amount, tank_amount, artillery_amount):
-        if original_country not in self.territories or selected_country not in self.territories:
+#moves the amount of units from original to selected territory
+#if amount is too great then 1 - territory units is moved from min function
+    def move_units(self, original_territory, selected_territory, infantry_amount, tank_amount, artillery_amount):
+        if original_territory not in self.territories or selected_territory not in self.territories:
             return False
-        if selected_country.name not in original_country.adjacent:
+        if selected_territory.name not in original_territory.adjacent:
             return False
         if infantry_amount + tank_amount + artillery_amount <= 0:
             return False
-        original_country.units["infantry"] -= infantry_amount
-        selected_country.units["infantry"] += infantry_amount
-        original_country.units["tank"] -= tank_amount
-        selected_country.units["tank"] += tank_amount
-        original_country.units["artillery"] -= artillery_amount
-        selected_country.units["artillery"] += artillery_amount
+        original_territory.units["infantry"] -= infantry_amount
+        selected_territory.units["infantry"] += infantry_amount
+        original_territory.units["tank"] -= tank_amount
+        selected_territory.units["tank"] += tank_amount
+        original_territory.units["artillery"] -= artillery_amount
+        selected_territory.units["artillery"] += artillery_amount
         return True

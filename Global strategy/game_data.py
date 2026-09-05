@@ -6,7 +6,7 @@ class GameData:
         self.continent = continent
         self.data = geopandas.read_file("./ne_50m_admin_0_countries/ne_50m_admin_0_countries.shp")
         self.remove = self.get_remove()
-        self.countries = self.get_countries()
+        self.territories = self.get_territories()
 
     def get_remove(self):
         if self.continent == "Europe":
@@ -16,15 +16,15 @@ class GameData:
         elif self.continent == "Asia":
             remove = ["Russia", "Cyprus", "Northern Cyprus",
                 "Brunei", "Bahrain", "Singapore",
-                "Maldives", "Timor-Leste", "Palestine","Taiwan"]
+                "Maldives", "Timor-Leste", "Palestine","Taiwan", "Indian Ocean Territories", "East Timor"]
         elif self.continent == "Africa":
             remove = ["Antigua and Barbuda", "Barbados","Dominica",
             "Grenada","Saint Kitts and Nevis","Saint Lucia","Saint Vincent and the Grenadines",
-            "Trinidad and Tobago","Bahamas","Cuba"]
+            "Trinidad and Tobago","Bahamas","Cuba", "Cabo Verde","São Tomé and Principe", "Comoros"]
         return remove
             
-    def get_countries(self):
-        countries = {}
+    def get_territories(self):
+        territories = {}
         for i, row in self.data.iterrows():
             if row["CONTINENT"] == self.continent and row["ADMIN"] not in self.remove:
                 name = row["ADMIN"]
@@ -38,13 +38,13 @@ class GameData:
                     if part.area > largest.area:
                         largest = part
                 coords = list(largest.exterior.coords)
-                countries[name] = coords
-        return countries
+                territories[name] = coords
+        return territories
 
     def save(self):
         filename = f"{self.continent.lower()}_coords.json"
         with open(filename, "w") as file:
-            json.dump(self.countries,file)
+            json.dump(self.territories,file)
 
 GameData("Europe").save()
 GameData("Asia").save()

@@ -48,7 +48,7 @@ class Button():
             if self.function:
                 self.function()
 
-class Sidebar:
+class Panel:
     def __init__(self, pos, width, height, font):
         self.pos = pos
         self.width = width

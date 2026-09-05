@@ -2,10 +2,12 @@ import pygame
 from combat import Combat
 
 class CombatManager:
-    def __init__(self, game):
-        self.game = game
+    def __init__(self, player, ui):
+        self.player = player
+        self.ui = ui
+        self.map = None
+        self.combat_finished = False
         self.incoming_attack = None
-        self.attack_text, self.attack_text_time, self.text_duration = None, 0, 2000
         self.combat_log = []
         self.round = 0
         self.max_round = 0
@@ -14,44 +16,57 @@ class CombatManager:
         self.pending_defender_before = 0
         self.pending_defender_owner = None
         self.combat_start_time = 0
-        self.skip_delay,self.finish_delay = 5000, 5000
+        self.skip_delay, self.finish_delay = 5000, 5000
 
-    def enter_attack(self):
-        if self.game.selected_country in self.game.player.territories:
-            self.game.state = "select_attack"
-            self.game.attacking_country = self.game.selected_country
-            self.game.UI.highlight_attack(self.game.attacking_country, self.game.map, self.game.player)
-            self.game.UI.update_sidebar(self.game.selected_country, self.game.player, self.game.update_unit_panel, self.enter_attack, self.game.move_manager.enter_move)
+    def enter_attack(self, selected_territory, attacking_territory, state, map):
+        if selected_territory in self.player.territories:
+            attacking_territory = selected_territory
+            state = "select_attack"
+            self.ui.highlight_attack(attacking_territory, map, self.player)
+        return state, attacking_territory
 
-    def handle_attack(self, clicked_country):
-        attacking_country = self.game.attacking_country
-        if attacking_country:
-            if clicked_country.name in attacking_country.adjacent:
-                if clicked_country not in self.game.player.territories and not clicked_country.combat and not attacking_country.combat:
-                    current_time = pygame.time.get_ticks()
-                    if current_time < clicked_country.attack_cooldown:
-                        return
-                    if attacking_country.total_units() <= 0:
-                        self.show_message("No units to attack with")
-                        return
-                    self.game.player.attacking_country, self.game.player.defending_country = attacking_country, clicked_country
-                    self.game.player.last_action = "attacking"
-                    self.pending_attacker_before = attacking_country.total_units()
-                    self.pending_defender_before = clicked_country.total_units()
-                    self.pending_defender_owner = clicked_country.owner
-                    battle = Combat(attacking_country, clicked_country)
-                    self.pending_result = battle.simulate_combat()
-                    self.combat_start_time = pygame.time.get_ticks()
-                    self.combat_log = battle.combat_log
-                    self.max_round = len(self.combat_log)
-                    self.round = 1
-                    self.game.state = "attacking"
-                    self.incoming_attack = (attacking_country, clicked_country)
-                    attacking_country.combat, clicked_country.combat = True, True
-                    self.attack_text = None
-                    self.game.UI.remove_highlight(self.game.map)
-                    self.game.attacking_country = None
-                    self.refresh_panel()
+    def handle_attack(self, clicked_territory, attacking_territory, state, map):
+        if not attacking_territory:
+            return state, attacking_territory
+
+        if clicked_territory.name not in attacking_territory.adjacent:
+            return state, attacking_territory
+
+        if clicked_territory in self.player.territories:
+            return state, attacking_territory
+
+        if clicked_territory.combat or attacking_territory.combat:
+            return state, attacking_territory
+
+        current_time = pygame.time.get_ticks()
+        if current_time < clicked_territory.attack_cooldown:
+            self.ui.show_message("Cannot attack - territory is on cooldown")
+            return state, attacking_territory
+
+        if attacking_territory.total_units() <= 0:
+            self.ui.show_message("No units to attack with")
+            return state, attacking_territory
+        
+        self.player.attacking_territory, self.player.defending_territory = attacking_territory, clicked_territory
+        self.player.last_action = "attacking"
+        self.pending_attacker_before = attacking_territory.total_units()
+        self.pending_defender_before = clicked_territory.total_units()
+        self.pending_defender_owner = clicked_territory.owner
+        battle = Combat(attacking_territory, clicked_territory)
+        self.pending_result = battle.simulate_combat()
+        self.combat_start_time = pygame.time.get_ticks()
+        self.combat_log = battle.combat_log
+        self.max_round = len(self.combat_log)
+        self.round = 1
+        self.incoming_attack = (attacking_territory, clicked_territory)
+        attacking_territory.combat, clicked_territory.combat = True, True
+        self.map = map
+        self.ui.remove_highlight(map)
+        state = "attacking"
+        attacking_territory = None
+        self.refresh_panel()
+        return state, attacking_territory
+        return state, attacking_territory
 
     def refresh_panel(self):
         current_time = pygame.time.get_ticks()
@@ -61,8 +76,8 @@ class CombatManager:
         result_text = None
         if is_last_round:
             result_text = "Victory" if self.pending_result == "attacker" else "Defeat"
-        self.game.UI.show_combat(self.combat_log, self.round, self.max_round,self.next_round, self.skip_combat,can_skip,can_finish, is_last_round, result_text)
-        
+        self.ui.open_combat_panel(self.combat_log, self.round, self.max_round, self.next_round, self.skip_combat, can_skip, can_finish, is_last_round, result_text)
+
     def next_round(self):
         if self.round < self.max_round:
             self.round += 1
@@ -74,31 +89,23 @@ class CombatManager:
         self.round = self.max_round
 
     def finish_combat(self):
-        self.game.UI.panel_visible = False
-        self.game.state = "play"
-        self.game.player.apply_attack_result(self.pending_result, self.pending_attacker_before,self.pending_defender_before, self.pending_defender_owner)
-        self.attack_text = None
+        self.ui.close_panel()
+        self.player.apply_attack_result(self.pending_result, self.pending_attacker_before, self.pending_defender_before, self.pending_defender_owner)
+        self.player.attacking_territory = None
+        self.player.defending_territory = None
         if self.incoming_attack:
             self.incoming_attack[0].combat = False
             self.incoming_attack[1].combat = False
-        self.game.UI.remove_highlight(self.game.map)
-        self.game.attacking_country = None
+        if self.map:
+            self.ui.remove_highlight(self.map)
+        self.incoming_attack = None
+        self.combat_finished = True
 
-    def show_message(self, text):
-        self.attack_text = text
-        self.attack_text_time = pygame.time.get_ticks()
-
-    def update(self):
-        current_time = pygame.time.get_ticks()
-        if self.game.state != "attacking":
-            if self.attack_text:
-                if current_time - self.attack_text_time >= self.text_duration:
-                    self.attack_text = None
-            return
+    def update(self, state):
+        if self.combat_finished:
+            self.combat_finished = False
+            state = "play"
+        if state != "attacking":  #prevent refresh panel being called when not in combat
+            return state
         self.refresh_panel()
-
-    def draw(self, screen):
-        font = pygame.font.SysFont(None, 35)
-        if self.game.state != "attacking" and self.attack_text:
-            text = font.render(self.attack_text, True, (255, 215, 0))
-            screen.blit(text, text.get_rect(center=(640, 360)))
+        return state

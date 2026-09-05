@@ -42,22 +42,22 @@ class AIScoring:
         ratio = attacker_value / defender_value
         return self.clamp(ratio - 1)
 
-    def connectivity_score(self,country, world, player, n):
+    def connectivity_score(self,territory, world, player, n):
         if n <= 0:
             return 0.0
         friendly_strength = 0
-        for name in country.adjacent:
-            neighbour = world.countries[name]
+        for name in territory.adjacent:
+            neighbour = world.territories[name]
             if neighbour in player.territories:
                 friendly_strength += neighbour.total_units()
         return self.clamp(friendly_strength / n)
 
-    def threat_score(self,country, world, enemy, n):
+    def threat_score(self,territory, world, enemy, n):
         if n <= 0:
             return 0.0
         enemy_strength = 0
-        for name in country.adjacent:
-            neighbour = world.countries[name]
+        for name in territory.adjacent:
+            neighbour = world.territories[name]
             if neighbour in enemy.territories:
                 enemy_strength += neighbour.total_units()
         return self.clamp(1 - (enemy_strength / n))
@@ -68,21 +68,21 @@ class AIScoring:
         avg_strength = sum(territory.total_units() for territory in self.player.territories) / len(self.player.territories)
         return max(avg_strength, 1.0)
 
-    def score_country(self,attacker, defender, world, player, enemy):
+    def score_territory(self,attacker, defender, world, enemy):
         n = self.get_average_count()
         scores = np.array([
             self.count_ratio_score(attacker, defender),
             self.value_ratio_score(attacker, defender),
-            self.connectivity_score(attacker, world, player, n),
+            self.connectivity_score(attacker, world, self.player, n),
             self.threat_score(attacker, world, enemy, n),])
         weights = PLAYSTYLE_SCORING_WEIGHTS[self.playstyle]
         return float(weights @ scores)
 
     def unit_strength(self,player):
-        return sum(country.unit_value(VALUE_WEIGHTS) for country in player.territories)
+        return sum(territory.unit_value(VALUE_WEIGHTS) for territory in player.territories)
 
     def territory_control(self,player,world):
-        total = len(world.countries)
+        total = len(world.territories)
         if total <= 0:
             return 0.0
         return len(player.territories) / total
@@ -91,13 +91,13 @@ class AIScoring:
         strength = 0
         for territory in self.player.territories:
             for name in territory.adjacent:
-                neighbour = world.countries[name]
+                neighbour = world.territories[name]
                 if neighbour in enemy.territories:
                     strength += neighbour.unit_value(VALUE_WEIGHTS)
         return strength
 
     def total_map_strength(self,world):
-        return max(sum(c.unit_value(VALUE_WEIGHTS) for c in world.countries.values()), 1.0)
+        return max(sum(c.unit_value(VALUE_WEIGHTS) for c in world.territories.values()), 1.0)
 
     def threat_of_enemy(self,enemy, world, weights=THREAT_WEIGHTS):
         map_strength = self.total_map_strength(world)
@@ -121,9 +121,9 @@ class AIScoring:
     def neutral_strength(self, world, enemies):
         seen = set()
         total = 0
-        for country in self.player.territories:
-            for name in country.adjacent:
-                neighbour = world.countries[name]
+        for territory in self.player.territories:
+            for name in territory.adjacent:
+                neighbour = world.territories[name]
                 if neighbour in self.player.territories:
                     continue
                 if any(neighbour in enemy.territories for enemy in enemies):
@@ -158,9 +158,9 @@ class AIScoring:
         return self.clamp(imbalance * multiplier)
 
     def has_neutral_neighbour(self, world, enemies):
-        for country in self.player.territories:
-            for name in country.adjacent:
-                neighbour = world.countries[name]
+        for territory in self.player.territories:
+            for name in territory.adjacent:
+                neighbour = world.territories[name]
                 if neighbour in self.player.territories:
                     continue
                 if any(neighbour in enemy.territories for enemy in enemies):
@@ -169,25 +169,25 @@ class AIScoring:
         return False
 
     def has_enemy_neighbour(self, world, enemies):
-        for country in self.player.territories:
-            for name in country.adjacent:
-                neighbour = world.countries[name]
+        for territory in self.player.territories:
+            for name in territory.adjacent:
+                neighbour = world.territories[name]
                 if any(neighbour in enemy.territories for enemy in enemies):
                     return True
         return False
 
     def weakest_territory_threat(self, enemies, world):
         n = self.get_average_count()
-        best_country, best_threat = None, 2.0 
-        for country in self.player.territories:
+        best_territory, best_threat = None, 2.0 
+        for territory in self.player.territories:
             for enemy in enemies:
-                t = self.threat_score(country, world, enemy, n)
+                t = self.threat_score(territory, world, enemy, n)
                 if t < best_threat:
                     best_threat = t
-                    best_country = country
-        if best_country is None:
+                    best_territory = territory
+        if best_territory is None:
             return None, 1.0
-        return best_country, best_threat
+        return best_territory, best_threat
 
     def choose_state(self,state_scores):
         states = list(state_scores.keys())
@@ -198,7 +198,7 @@ class AIScoring:
         return str(np.random.choice(states, p=probabilities))
 
     def check_empty_territory(self):
-        return any(country.total_units() <= 0 for country in self.player.territories)
+        return any(territory.total_units() <= 0 for territory in self.player.territories)
 
     def get_priority(self,score):
         return score[0]
@@ -206,20 +206,20 @@ class AIScoring:
     def purchase_priority(self,world, enemies):
         n = self.get_average_count()
         scored = []
-        for country in self.player.territories:
-            if country.combat:
+        for territory in self.player.territories:
+            if territory.combat:
                 continue
-            threat = min((self.threat_score(country, world, enemy, n) for enemy in enemies), default=1.0)
+            threat = min((self.threat_score(territory, world, enemy, n) for enemy in enemies), default=1.0)
             danger = 1 - threat
-            neutral_adjacent = sum(1 for name in country.adjacent if world.countries[name] not in self.player.territories
-                            and not any(world.countries[name] in enemy.territories for enemy in enemies))
+            neutral_adjacent = sum(1 for name in territory.adjacent if world.territories[name] not in self.player.territories
+                            and not any(world.territories[name] in enemy.territories for enemy in enemies))
             priority = danger + (0.1 * neutral_adjacent)
-            scored.append((priority, country, danger))
+            scored.append((priority, territory, danger))
         scored.sort(key=self.get_priority, reverse=True)
-        return [(country, danger) for priority, country, danger in scored]   
+        return [(territory, danger) for priority, territory, danger in scored]   
 
-    def path_bonus(self,country, path_countries):
-        return 0.15 if country.name in path_countries else 0.0
+    def path_bonus(self,territory, path_territories):
+        return 0.15 if territory.name in path_territories else 0.0
 
     def new_transition_matrix(self):
         return {state: {state_2: BASE_COUNT for state_2 in STATES} for state in STATES}
@@ -240,8 +240,8 @@ class AIScoring:
     def neighbouring_enemies(self, world, enemies):
         result = []
         for enemy in enemies:
-            for country in self.player.territories:
-                if any(world.countries[name] in enemy.territories for name in country.adjacent):
+            for territory in self.player.territories:
+                if any(world.territories[name] in enemy.territories for name in territory.adjacent):
                     result.append(enemy)
                     break
         return result

@@ -4,8 +4,8 @@ import pygame
 from combat import Combat, VALUE_WEIGHTS
 
 class AI(Player):
-    def __init__(self, country, playstyle, offset):
-        super().__init__(country)
+    def __init__(self, territory, playstyle, offset):
+        super().__init__(territory)
         self.playstyle = playstyle
         self.delay = 7000
         self.attack_duration = 6000
@@ -23,17 +23,17 @@ class AI(Player):
                 self.opponent_matrices[opponent] = self.scorer.new_transition_matrix()
             last_action = self.last_observed_action.get(opponent)
             if last_action is not None and last_action != current_action:
-                print(f"[MARKOV] {self.country.name} observed {opponent.country.name}: {last_action} -> {current_action}")
+                print(f"[MARKOV] {self.territory.name} observed {opponent.territory.name}: {last_action} -> {current_action}")
                 self.scorer.record_transition(self.opponent_matrices[opponent], last_action, current_action)
             self.last_observed_action[opponent] = current_action
 
     def attack(self):
-        if self.attacking_country is None or self.defending_country is None:
+        if self.attacking_territory is None or self.defending_territory is None:
             return None
-        attacker_before = self.attacking_country.total_units()
-        defender_before = self.defending_country.total_units()
-        defender_owner = self.defending_country.owner
-        battle = Combat(self.attacking_country, self.defending_country)
+        attacker_before = self.attacking_territory.total_units()
+        defender_before = self.defending_territory.total_units()
+        defender_owner = self.defending_territory.owner
+        battle = Combat(self.attacking_territory, self.defending_territory)
         result = battle.simulate_combat()
         return self.apply_attack_result(result, attacker_before, defender_before, defender_owner)
 
@@ -70,15 +70,18 @@ class AI(Player):
             return 0.5, 0.5
         return passive_total / count, aggressive_total / count
 
+    def get_target_value(self,pair):
+        return pair[0]
+
     def choose_targets(self, world, count=4):
-        candidates = []
-        for country in world.countries.values():
-            if country in self.territories:
+        targets = []
+        for territory in world.territories.values():
+            if territory in self.territories:
                 continue
-            value = country.unit_value(VALUE_WEIGHTS) + len(country.adjacent) * 2
-            candidates.append((value, country))
-        candidates.sort(key=lambda pair: pair[0], reverse=True)
-        return [country for value, country in candidates[:count]]
+            value = territory.unit_value(VALUE_WEIGHTS) + len(territory.adjacent) * 2
+            targets.append((value, territory))
+        targets.sort(key=self.get_target_value, reverse=True)
+        return [territory for value, territory in targets[:count]]
 
     def search(self, start, target, world):
         queue = [start]
@@ -93,7 +96,7 @@ class AI(Player):
                 break
             else:
                 for name in current.adjacent:
-                    neighbour = world.countries[name]
+                    neighbour = world.territories[name]
                     if neighbour not in visited:
                         visited.add(neighbour)
                         previous[neighbour] = current
@@ -122,45 +125,49 @@ class AI(Player):
                     best_path = path
         return best_path
 
-    def best_attack_target(self, world, enemies, path_countries):
+    def best_attack_target(self, world, enemies, path_territories):
         best, best_score = None, -1
         current_time = pygame.time.get_ticks()
-        for country in self.territories:
-            if country.combat:
+        for territory in self.territories:
+            if territory.combat:
                 continue
-            for name in country.adjacent:
-                neighbour = world.countries[name]
-                owner = next((e for e in enemies if neighbour in e.territories), None)
+            for name in territory.adjacent:
+                neighbour = world.territories[name]
+                owner = None
+                for enemy in enemies:
+                    if neighbour in enemy.territories:
+                        owner = enemy
+                        break
                 if owner is None or neighbour.combat:
                     continue
                 if neighbour.attack_cooldown > current_time:
                     continue
-                score = self.scorer.score_country(country, neighbour, world, owner)
-                score += self.scorer.path_bonus(neighbour, path_countries)
+                score = self.scorer.score_territory(territory, neighbour, world, owner)
+                score += self.scorer.path_bonus(neighbour, path_territories)
                 if score > best_score:
                     best_score = score
-                    best = (country, neighbour)
+                    best = (territory, neighbour)
         return best, best_score
 
-    def best_expansion_target(self, world, enemies, path_countries):
+    def best_expansion_target(self, world, enemies, path_territories):
         best, best_score = None, -1
         current_time = pygame.time.get_ticks()
-        for country in self.territories:
-            if country.combat:
+        for territory in self.territories:
+            if territory.combat:
                 continue
-            for name in country.adjacent:
-                neighbour = world.countries[name]
+            for name in territory.adjacent:
+                neighbour = world.territories[name]
                 if neighbour in self.territories or neighbour.combat:
                     continue
                 if any(neighbour in enemy.territories for enemy in enemies):
                     continue  
                 if neighbour.attack_cooldown > current_time:
                     continue
-                score = (self.scorer.count_ratio_score(country, neighbour) + self.scorer.value_ratio_score(country, neighbour)) / 2
-                score += self.scorer.path_bonus(neighbour, path_countries)
+                score = (self.scorer.count_ratio_score(territory, neighbour) + self.scorer.value_ratio_score(territory, neighbour)) / 2
+                score += self.scorer.path_bonus(neighbour, path_territories)
                 if score > best_score:
                     best_score = score
-                    best = (country, neighbour)
+                    best = (territory, neighbour)
         return best, best_score
 
     def update_ai(self, world, player, ai_players):
@@ -171,7 +178,7 @@ class AI(Player):
         if self.state == "attacking":
             if current_time - self.last_attack >= self.attack_duration:
                 self.attack()
-                self.attacking_country.combat, self.defending_country.combat = False, False
+                self.attacking_territory.combat, self.defending_territory.combat = False, False
                 self.state = "idle"
                 self.next_action = current_time + self.delay
             return
@@ -188,18 +195,32 @@ class AI(Player):
         else:
             return {"infantry": 0.7, "artillery": 0.3}
 
-    def spend_leftover(self,reserve,country,infantry_cost,tank_cost,artillery_cost):
-        while self.currency - reserve >= infantry_cost:
-            leftover = self.currency - reserve
-            if leftover >= artillery_cost * 3.5:
-                amount = int(leftover // artillery_cost)
-                self.buy_units(country, "artillery", amount)
-            elif leftover >= tank_cost * 2.5:
-                amount = int(leftover // tank_cost)
-                self.buy_units(country, "tank", amount)
+    def spend_leftover(self,reserve,scored,infantry_cost,tank_cost,artillery_cost):
+        if not scored:
+            return
+        top_territories = [territory for territory, danger in scored[:5]]
+        leftover = self.currency - reserve
+        if leftover < infantry_cost:
+            return
+        share = leftover / len(top_territories)
+        for territory in top_territories:
+            if self.currency - reserve < infantry_cost:
+                break
+            territory_share = min(share, self.currency - reserve)
+            if territory_share >= artillery_cost * 3:
+                amount = int(territory_share // artillery_cost)
+                self.buy_units(territory, "artillery", amount)
+            elif territory_share >= tank_cost * 2:
+                amount = int(territory_share // tank_cost)
+                self.buy_units(territory, "tank", amount)
             else:
-                amount = int(leftover // infantry_cost)
-                self.buy_units(country, "infantry", max(amount, 1))
+                amount = int(territory_share // infantry_cost)
+                if amount > 0:
+                    self.buy_units(territory, "infantry", amount)
+        remaining = self.currency - reserve
+        if remaining >= infantry_cost:
+            amount = int(remaining // infantry_cost)
+            self.buy_units(top_territories[0], "infantry", amount)
 
 
     def purchase_units(self, world, enemies):
@@ -211,42 +232,40 @@ class AI(Player):
             return
         current_time = pygame.time.get_ticks()
         elapsed = current_time - self.start_time
-        reserve_fraction = 0.0 if elapsed < 40000 else 0.15
+        reserve_fraction = 0.0 if elapsed < 60000 else 0.15
         reserve = self.currency * reserve_fraction
         budget = max(self.currency - reserve, 0)
         if budget <= 0:
             return
-        weight_total = sum(0.3 + d for _, d in scored)
+        weight_total = sum(0.2 + danger for territory, danger in scored)
         if weight_total <= 0:
             return
-        for country, danger in scored:
+        for territory, danger in scored:
             if self.currency < infantry_cost:
                 break
-            share = (0.3 + danger) / weight_total
-            country_budget = budget * share
+            share = (0.2 + danger) / weight_total
+            territory_budget = budget * share
             mix = self.unit_type_mix(danger)
             for unit_type, fraction in mix.items():
                 if self.currency < infantry_cost:
                     break
-                type_budget = country_budget * fraction
+                type_budget = territory_budget * fraction
                 cost = self.scorer.unit_cost(unit_type)
                 amount = int(type_budget // cost)
                 amount = min(amount, self.currency // cost)
                 if amount > 0:
-                    self.buy_units(country, unit_type, amount)
-        top_country = scored[0][0]
-        self.spend_leftover(reserve,top_country,infantry_cost,tank_cost,artillery_cost)
+                    self.buy_units(territory, unit_type, amount)
+        self.spend_leftover(reserve,scored,infantry_cost,tank_cost,artillery_cost)
 
     def evaluate_state(self, world, enemies):
         self.observe_opponents(enemies)
-        self.purchase_units(world, enemies)
         strength_advantage = self.scorer.strength_advantage(enemies, world)
         expansion_advantage = self.scorer.expansion_advantage(world, enemies)
         can_expand = self.scorer.has_neutral_neighbour(world, enemies) and not self.scorer.check_empty_territory()
         can_attack = self.scorer.has_enemy_neighbour(world, enemies) and not self.scorer.check_empty_territory()
-        weak_country, threat = self.scorer.weakest_territory_threat(enemies, world)
+        weak_territory, threat = self.scorer.weakest_territory_threat(enemies, world)
         danger = 1 - threat
-        can_defend = weak_country is not None and any(world.countries[name] in self.territories for name in weak_country.adjacent)
+        can_defend = weak_territory is not None and any(world.territories[name] in self.territories for name in weak_territory.adjacent)
         can_reinforce = len(self.territories) >= 2
         local_passive, local_aggressive = self.predicted_local_states(world, enemies)
         global_passive, global_aggressive = self.predicted_global_states(enemies)
@@ -260,73 +279,73 @@ class AI(Player):
         state_scores = self.scorer.apply_playstyle_weights(state_scores)
         chosen = self.scorer.choose_state(state_scores)
         print(f"{state_scores} chosen state: {chosen}")
-        return chosen,weak_country
+        return chosen,weak_territory
 
     def execute_actions(self,world,enemies):
         self.purchase_units(world, enemies)
-        state, weak_country = self.evaluate_state(world,enemies)
+        state, weak_territory = self.evaluate_state(world,enemies)
         self.last_action = state
         path = self.get_target_path(world)
-        path_countries = {country.name for country in path} if path else set()
+        path_territories = {territory.name for territory in path} if path else set()
         if state == "attacking":
-            pair, _ = self.best_attack_target(world, enemies, path_countries)
+            pair, _ = self.best_attack_target(world, enemies, path_territories)
             if pair:
-                self.start_attack(*pair)
+                self.start_attack(pair[0],pair[1])
                 print(f"[ATTACK] state after start_attack: {self.state}")
             else:
                 self.state = "idle"
                 print("[ATTACK] no pair found, staying idle")
         elif state == "expanding":
-            pair, _ = self.best_expansion_target(world, enemies, path_countries)
+            pair, _ = self.best_expansion_target(world, enemies, path_territories)
             print(f"[EXPAND] pair found: {pair is not None}")
             if pair:
-                self.start_attack(*pair) 
+                self.start_attack(pair[0],pair[1]) 
             else:
                 self.state = "idle"
         elif state == "reinforcing":
-            self.send_units(world)
+            self.reinforce(world)
             self.state = "idle"
         elif state == "defending":
-            if weak_country:
-                self.reinforce(weak_country, world)
+            if weak_territory:
+                self.defend(weak_territory, world)
             self.state = "idle"
         else:
             self.state = "idle"
 
     def start_attack(self, attacker, defender):
-        self.attacking_country, self.defending_country = attacker, defender
+        self.attacking_territory, self.defending_territory = attacker, defender
         self.state = "attacking"
         attacker.combat, defender.combat = True, True
         self.last_attack = pygame.time.get_ticks()
 
-    def send_units(self, world):
-        for country in self.territories:
-            if country.combat:
+    def reinforce(self, world):
+        for territory in self.territories:
+            if territory.combat:
                 continue
-            for neighbour_name in country.adjacent:
-                neighbour = world.countries[neighbour_name]
-                if neighbour in self.territories and country.total_units() > neighbour.total_units() + 1:
-                    amount = (country.total_units() - neighbour.total_units()) // 2
-                    self.split_move(country, neighbour, amount)
+            for neighbour_name in territory.adjacent:
+                neighbour = world.territories[neighbour_name]
+                if neighbour in self.territories and territory.total_units() > neighbour.total_units() + 1:
+                    amount = (territory.total_units() - neighbour.total_units()) // 2
+                    self.move_units(territory, neighbour, amount)
 
-    def reinforce(self, target, world):
+    def defend(self, target, world):
         if target.combat:
             return
         best_source, best_units = None, -1
         for name in target.adjacent:
-            neighbour = world.countries[name]
+            neighbour = world.territories[name] 
             if neighbour in self.territories and neighbour.total_units() > best_units:
                 best_units = neighbour.total_units()
                 best_source = neighbour
         if best_source and best_units > 1:
             amount = best_units // 2
-            self.split_move(best_source, target, amount)
+            self.move_units(best_source, target, amount)
 
-    def split_move(self, original_country, selected_country, amount):
-        total = original_country.total_units()
+    def move_units(self, original_territory, selected_territory, amount):
+        total = original_territory.total_units()
         if total <= 0 or amount <= 0:
             return
-        infantry = min(original_country.units.get("infantry", 0), (amount * original_country.units.get("infantry", 0)) // total)
-        tank = min(original_country.units.get("tank", 0), (amount * original_country.units.get("tank", 0)) // total)
-        artillery = min(original_country.units.get("artillery", 0), (amount * original_country.units.get("artillery", 0)) // total)
-        super().move_units(original_country, selected_country, infantry, tank, artillery)
+        infantry = min(original_territory.units.get("infantry", 0), (amount * original_territory.units.get("infantry", 0)) // total)
+        tank = min(original_territory.units.get("tank", 0), (amount * original_territory.units.get("tank", 0)) // total)
+        artillery = min(original_territory.units.get("artillery", 0), (amount * original_territory.units.get("artillery", 0)) // total)
+        super().move_units(original_territory, selected_territory, infantry, tank, artillery)

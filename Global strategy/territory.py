@@ -35,14 +35,16 @@ class Territory:
             return (255, 80, 80)
         if player and self in player.territories:
             return (0, 100, 255)
-        for i, ai in enumerate(ai_players):
+        count = 0
+        for ai in ai_players:
             if self in ai.territories:
-                return AI_COLOURS[i % len(AI_COLOURS)]
+                return AI_COLOURS[count % len(AI_COLOURS)]
+            count += 1
         if self.hovered and not self.highlighted:
             return (250, 220, 110)
         return self.colour
 
-#drawing country polygon along with the country outline/border
+#drawing territory polygon along with the territory outline/border
     def draw(self, screen, camera_pos, camera_zoom, player, ai_players):
         colour = self.get_colour(player,ai_players)
         pygame.draw.polygon(screen,colour,self.get_coordinates(camera_pos,camera_zoom)) # taking surface,colour,converted points and width

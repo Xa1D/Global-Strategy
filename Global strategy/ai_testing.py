@@ -1,43 +1,12 @@
 #import json
 #data = json.load(open("africa_coords.json"))
 #print([n for n in data.keys() if "nea" in n or "adagascar" in n])
-
-"""
-AI test suite - headless, no pygame window needed.
- 
-Covers:
-  1. Scoring function correctness (count/value ratio, threat, connectivity)
-  2. Markov chain prediction accuracy (does it converge to the true
-     transition probabilities given enough observations?)
-  3. BFS pathfinding correctness (AI.search on a known small graph)
-  4. choose_state's probability-weighted sampling (does the empirical
-     distribution match the intended probabilities?)
-  5. Full AI decision-cycle simulation - two AIs running many cycles
-     on a small fake map, with a fast-forwarded fake clock, logging
-     state choices, purchases, and attacks so you can eyeball whether
-     the AI is "doing sensible things" over a real playthrough length.
- 
-Usage:
-    python ai_test_suite.py
- 
-Drop this in the same folder as ai.py, player.py, ai_scoring.py, combat.py.
-"""
-
 import pygame
 pygame.init()
-
 import ai_scoring
 from ai import AI
 from player import Player
 from combat import VALUE_WEIGHTS
-
-
-# ============================================================
-# Fake clock - lets pygame.time.get_ticks() be fast-forwarded
-# instantly instead of waiting on real time. Every module that
-# calls pygame.time.get_ticks() will see this fake value, since
-# we're monkeypatching the function itself.
-# ============================================================
 
 class FakeClock:
     def __init__(self):
@@ -48,17 +17,6 @@ class FakeClock:
 
     def get_ticks(self):
         return self.t
-
-
-fake_clock = FakeClock()
-pygame.time.get_ticks = fake_clock.get_ticks
-
-
-# ============================================================
-# Minimal mock Country/World - duck-typed to match what
-# ai_scoring.py and ai.py actually touch, without needing
-# shapely/pygame rendering/real map JSON files.
-# ============================================================
 
 class MockCountry:
     def __init__(self, name, infantry=0, tank=0, artillery=0, adjacent=None):
@@ -79,11 +37,17 @@ class MockCountry:
     def __repr__(self):
         return f"<{self.name}>"
 
-
 class MockWorld:
     def __init__(self, countries):
         self.countries = {c.name: c for c in countries}
 
+class MockOwner:
+    def __init__(self, territories=None):
+        self.territories = territories or []
+
+
+fake_clock = FakeClock()
+pygame.time.get_ticks = fake_clock.get_ticks
 
 def build_line_map(length=8):
     """A -> B -> C -> ... in a straight line, for BFS testing."""
@@ -118,15 +82,6 @@ def build_grid_map(w=4, h=4):
         c.adjacent = adj
     return MockWorld(countries), grid
 
-
-# ============================================================
-# 1. Scoring function correctness
-# ============================================================
-
-class MockOwner:
-    """Minimal stand-in for a Player/AI - threat_score etc. only need .territories."""
-    def __init__(self, territories=None):
-        self.territories = territories or []
 
 
 def test_scoring_functions():
@@ -186,17 +141,11 @@ def test_scoring_functions():
     print("All scoring function checks PASSED.")
 
 
-# ============================================================
-# 2. Markov chain prediction accuracy
-# ============================================================
-
 def test_markov_accuracy():
     print("\n" + "=" * 60)
     print("2. MARKOV PREDICTION ACCURACY")
     print("=" * 60)
-
     matrix = ai_scoring.new_transition_matrix()
-
     # simulate an opponent that, from "attacking", goes to "defending"
     # 70% of the time and "idle" 30% of the time - see if enough
     # observations make predict_next_state converge close to that
@@ -207,12 +156,10 @@ def test_markov_accuracy():
         roll = random.random()
         to_state = "defending" if roll < 0.7 else "idle"
         ai_scoring.record_transition(matrix, "attacking", to_state)
-
     prediction = ai_scoring.predict_next_state(matrix, "attacking")
     print(f"After {n_observations} observations (true: 70% defending, 30% idle):")
     for state, prob in prediction.items():
         print(f"  {state}: {prob:.3f}")
-
     defending_prob = prediction["defending"]
     print(f"\nPredicted P(defending): {defending_prob:.3f} (true: 0.70)")
     error = abs(defending_prob - 0.70)
@@ -234,10 +181,6 @@ def test_markov_accuracy():
         "FAILED: unobserved row should be exactly uniform"
     print("PASSED: unobserved row is uniform as expected.")
 
-
-# ============================================================
-# 3. BFS pathfinding correctness
-# ============================================================
 
 def test_pathfinding():
     print("\n" + "=" * 60)
@@ -265,31 +208,19 @@ def test_pathfinding():
     print("PASSED: unreachable target handled without crashing.")
 
 
-# ============================================================
-# 4. choose_state probability-weighted sampling accuracy
-# ============================================================
 
 def test_choose_state_distribution():
     print("\n" + "=" * 60)
     print("4. CHOOSE_STATE SAMPLING DISTRIBUTION")
     print("=" * 60)
-
-    state_scores = {
-        "attacking": 0.6,
-        "expanding": 0.3,
-        "defending": 0.1,
-        "reinforcing": 0.0,
-        "idle": 0.2,
-    }
+    state_scores = {"attacking": 0.6,"expanding": 0.3,"defending": 0.1,"reinforcing": 0.0,"idle": 0.2,}
     total = sum(state_scores.values())
     expected_probs = {s: v / total for s, v in state_scores.items()}
-
     trials = 5000
     counts = {s: 0 for s in state_scores}
     for _ in range(trials):
         chosen = ai_scoring.choose_state(state_scores)
         counts[chosen] += 1
-
     print(f"Over {trials} draws:")
     print(f"{'state':<12}{'expected':>10}{'observed':>10}")
     for s in state_scores:
@@ -298,33 +229,23 @@ def test_choose_state_distribution():
         print(f"{s:<12}{expected:>10.3f}{observed:>10.3f}")
         assert abs(expected - observed) < 0.03, \
             f"FAILED: {s} distribution off by more than expected sampling noise"
-
     print("PASSED: empirical distribution matches intended probabilities.")
 
-
-# ============================================================
-# 5. Full AI decision-cycle simulation
-# ============================================================
 
 def run_ai_simulation(cycles=40, verbose=True):
     print("\n" + "=" * 60)
     print("5. FULL AI SIMULATION (grid map, two AI, fast-forwarded clock)")
     print("=" * 60)
-
     world, grid = build_grid_map(4, 4)
-
     # give one AI a starting country and a human "player" stand-in
     player_country = grid[(0, 0)]
     ai_1_country = grid[(3, 3)]
     ai_2_country = grid[(0, 3)]
-
     player = Player(player_country)
     ai_1 = AI(ai_1_country, playstyle="aggressive", offset=0)
     ai_2 = AI(ai_2_country, playstyle="defensive", offset=1500)
     ai_players = [ai_1, ai_2]
-
     state_log = {ai_1.country.name: [], ai_2.country.name: []}
-
     for cycle in range(cycles):
         fake_clock.advance(1000)  # advance 1 simulated second per loop tick
         for ai in ai_players:
@@ -333,32 +254,20 @@ def run_ai_simulation(cycles=40, verbose=True):
             ai.update()
             if ai.last_action != before_state:
                 state_log[ai.country.name].append(ai.last_action)
-
     print(f"Ran {cycles} simulated seconds.\n")
     for name, log in state_log.items():
         print(f"{name} state history: {log}")
-
     print("\nFinal summary:")
     for ai in ai_players:
         print(f"  {ai.country.name} ({ai.playstyle}): "
               f"{len(ai.territories)} territories, {ai.currency} currency, "
               f"{ai.attacks_made} attacks ({ai.attacks_won}W/{ai.attacks_lost}L), "
               f"currency_spent={ai.currency_spent}")
-
     return ai_players, state_log
 
 
-# ============================================================
-# Run everything
-# ============================================================
-
-if __name__ == "__main__":
-    test_scoring_functions()
-    test_markov_accuracy()
-    test_pathfinding()
-    test_choose_state_distribution()
-    run_ai_simulation(cycles=40)
-
-    print("\n" + "=" * 60)
-    print("ALL TESTS COMPLETE")
-    print("=" * 60)
+test_scoring_functions()
+test_markov_accuracy()
+test_pathfinding()
+test_choose_state_distribution()
+run_ai_simulation(cycles=40)
