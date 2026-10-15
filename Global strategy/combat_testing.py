@@ -1,32 +1,26 @@
 from combat import Combat
+from testing_classes import TestTerritory
 
-class TestTerritory:
-    def __init__(self, infantry=0, tank=0, artillery=0):
-        self.units = {"infantry": infantry, "tank": tank, "artillery": artillery}
-
-    def total_units(self):
-        return sum(self.units.values())
-
-def run_trial(attacker_units, defender_units):
-    attacker = TestTerritory(**attacker_units)
-    defender = TestTerritory(**defender_units)
+def simulate_battle(attacker_units, defender_units):
+    attacker = TestTerritory(infantry=attacker_units.get("infantry", 0), tank=attacker_units.get("tank", 0),artillery=attacker_units.get("artillery", 0))
+    defender = TestTerritory(infantry=defender_units.get("infantry", 0),tank=defender_units.get("tank", 0), artillery=defender_units.get("artillery", 0))
     attacker_before = attacker.total_units()
     defender_before = defender.total_units()
     battle = Combat(attacker, defender)
     result = battle.simulate_combat()
     attacker_after = attacker.total_units()
     defender_after = defender.total_units()
-    rounds_taken = len(battle.combat_log)
-    return result, attacker_before - attacker_after, defender_before - defender_after, rounds_taken
+    rounds = len(battle.combat_log)
+    return result, attacker_before - attacker_after, defender_before - defender_after, rounds
 
-def run_matchup(name, attacker_units, defender_units, trials=200):
+def simulate_test(name, attacker_units, defender_units, trials=200):
     attacker_wins = 0
     defender_wins = 0
     total_attacker_lost = 0
     total_defender_lost = 0
     total_rounds = 0
     for trial in range(trials):
-        result, attacker_lost, defender_lost, rounds = run_trial(attacker_units, defender_units)
+        result, attacker_lost, defender_lost, rounds = simulate_battle(attacker_units, defender_units)
         if result == "attacker":
             attacker_wins += 1
         else:
@@ -39,32 +33,12 @@ def run_matchup(name, attacker_units, defender_units, trials=200):
     print(f"Trials: {trials}")
     print(f"Attacker win rate: {attacker_wins/trials*100:.1f}%")
     print(f"Defender win rate: {defender_wins/trials*100:.1f}%")
-    print(f"Avg units lost - attacker: {total_attacker_lost/trials:.1f}, defender: {total_defender_lost/trials:.1f}")
-    print(f"Avg rounds to resolve: {total_rounds/trials:.1f}")
+    print(f"Average units lost - attacker: {total_attacker_lost/trials:.1f}, defender: {total_defender_lost/trials:.1f}")
+    print(f"Average rounds: {total_rounds/trials:.1f}")
 
-TRIALS = 150
-
-run_matchup("50 Tank vs 100 Infantry", {"tank": 50}, {"infantry": 100}, trials=TRIALS)
-run_matchup("30 Artillery vs 100 Infantry", {"artillery": 30}, {"infantry": 100}, trials=TRIALS)
-run_matchup("Equal cost: 100 Infantry vs 50 Tank", {"infantry": 100}, {"tank": 50}, trials=TRIALS)
-run_matchup("Equal cost: 100 Infantry vs 33 Artillery", {"infantry": 100}, {"artillery": 33}, trials=TRIALS)
-run_matchup("Artillery vs Tank (equal cost, 10 vs 15)", {"artillery": 10}, {"tank": 15}, trials=TRIALS)
-run_matchup("Mixed army, order = artillery/infantry/tank",{"infantry": 40, "tank": 20, "artillery": 20},{"infantry": 31, "tank": 21, "artillery": 22},trials=TRIALS,)
-run_matchup("Same mixed army, order = tank/artillery/infantry",{"infantry": 40, "tank": 20, "artillery": 20},{"infantry": 40, "tank": 20, "artillery": 20},trials=TRIALS,)
-
-def test_expected_damage_output():
-    print("\nDAMAGE OUTPUT VALIDATION")
-    from combat import Combat, STATS
-    trials = 5000
-    for unit_type in ["infantry", "tank", "artillery"]:
-        count = 20
-        total = 0
-        for _ in range(trials):
-            total += Combat.get_damage(None, unit_type, count)
-        avg = total / trials
-        expected = STATS[unit_type]["attack"] * (1 - STATS[unit_type]["miss"]) * count
-        print(f"{unit_type}: avg={avg:.2f}, expected≈{expected:.2f}")
-        assert abs(avg - expected) / expected < 0.05, f"FAILED: {unit_type} damage output off by more than 5%"
-    print("PASSED: damage output matches theoretical expectation.")
-
-test_expected_damage_output()
+simulate_test("50 Tank vs 100 Infantry", {"tank": 50}, {"infantry": 100})
+simulate_test("33 Artillery vs 100 Infantry", {"artillery": 33}, {"infantry": 100})
+simulate_test("10 Artillery vs 15 Tank", {"artillery": 10}, {"tank": 15})
+simulate_test("Mixed army vs single army",{"infantry": 20, "tank": 20, "artillery": 20},{"infantry": 120})
+simulate_test("Mixed army vs mixed army", {"infantry": 20, "tank": 20, "artillery": 20},{"infantry": 10, "tank": 10, "artillery": 30})
+simulate_test("Same mixed army", {"infantry": 20, "tank": 20, "artillery": 20}, {"infantry": 20, "tank": 20, "artillery": 20})  

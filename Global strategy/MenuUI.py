@@ -3,7 +3,7 @@ from GUI import Button
 
 class MenuUI:
     def __init__(self):
-        self.menu_font = pygame.font.SysFont("cambria", 60)
+        self.menu_font = pygame.font.SysFont("viga", 60)
         self.image = pygame.image.load("assets/Play Rect.png").convert_alpha()
 
         self.play_button = Button("Play", (640, 300), self.menu_font, "white", "blue", image=self.image)

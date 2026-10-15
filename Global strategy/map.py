@@ -4,6 +4,7 @@ from GUI import Camera
 from territory import Territory
 import json
 
+#loads selected map and constructs territory data to be used by the game
 class Map:
     def __init__(self, map_file):
         self.file = map_file
@@ -12,18 +13,20 @@ class Map:
         self.territory_data = self.get_map_data()
         self.create_map()   
 
+    #Decides the map size which determines the coordinate scaling - Europe is smaller so greater map size means Europe will appear larger
     def get_map_size(self):
-        if self.file == "europe_coords.json":
+        if self.file == "europe_coordinates.json":
             width, height = 8000, 4000
             map = "Europe"
-        elif self.file == "asia_coords.json":
+        elif self.file == "asia_coordinates.json":
             width, height = 4000, 2000
             map = "Asia"
-        elif self.file == "africa_coords.json":
+        elif self.file == "africa_coordinates.json":
             width, height = 4000, 2000
             map = "Africa"
         return width, height, map
-        
+
+    #reads the selected JSON file and returns the dictionary containing territory data 
     def get_map_data(self):
         with open(self.file,"r") as file:
             territory_data = json.load(file)
@@ -34,18 +37,22 @@ class Map:
         self.get_adjacent()
         self.get_units()
 
-#converting longitude and latitude into screen coordinates
+#converting longitude and latitude into map coordinates
     def get_territories(self):
-        for name,coords in self.territory_data.items():
-          map_coords = []
-          for coord in coords:
-              x = (self.width / 360) * (coord[0] + 180)
-              y = (self.height / 180) * (90 - coord[1])
-              map_coords.append((x, y))
-          self.territories[name] = Territory(name, map_coords)
-        
+        for name, territory_parts in self.territory_data.items():
+            map_parts = []
+            for part in territory_parts:
+                map_coordinates = []
+                for coord in part:
+                    x = (self.width / 360) * (coord[0] + 180)
+                    y = (self.height / 180) * (90 - coord[1])
+                    map_coordinates.append((x, y))
+                map_parts.append(map_coordinates)
+            self.territories[name] = Territory(name, map_parts) #creates one territory containing all the country's parts
+    
     def get_adjacent(self):
-        if self.file == "europe_coords.json":
+        # adding extra adjacency links for islands and disconnected territories
+        if self.file == "europe_coordinates.json":
             extra_adjacent = {"United Kingdom": ["Ireland", "France", "Iceland"],
             "Ireland": ["United Kingdom", "Iceland"],
             "Iceland": ["United Kingdom", "Ireland"],
@@ -56,9 +63,10 @@ class Map:
             "Estonia": ["Finland"],
             "France": ["United Kingdom"]}
 
-        elif self.file == "asia_coords.json":
-            extra_adjacent = {"Japan": ["South Korea", "China"],
+        elif self.file == "asia_coordinates.json":
+            extra_adjacent = {"Japan": ["South Korea", "North Korea"],
             "South Korea": ["Japan"],
+            "North Korea" : ["Japan"],
             "Sri Lanka": ["India"],
             "India": ["Sri Lanka"],
             "Philippines": ["Vietnam", "Malaysia"],
@@ -66,24 +74,25 @@ class Map:
             "Malaysia": ["Philippines"],
             "Indonesia": ["Malaysia"]}
 
-        elif self.file == "africa_coords.json":
+        elif self.file == "africa_coordinates.json":
             extra_adjacent = {"Madagascar": ["Mozambique", "United Republic of Tanzania"],
             "Mozambique": ["Madagascar"],
             "United Republic of Tanzania": ["Madagascar"]}
 
+        #compare each territory with every other one to check polygon intersection for adjacency
         for name, territory in self.territories.items():
             adjacent = []
             for neighbour_name, neighbour in self.territories.items():
                 if name != neighbour_name:
-                    if territory.polygon.intersects(neighbour.polygon):
+                    if territory.shape.intersects(neighbour.shape):
                         adjacent.append(neighbour_name)
             if name in extra_adjacent:
                 adjacent += extra_adjacent[name]
             territory.adjacent = list(set(adjacent))
 
     def get_units(self):
+        #starting units determined by countries development 
         starting_units = {"Europe": {
-            # Europe
             "Albania": 12, "Austria": 17, "Belarus": 16,
             "Belgium": 18, "Bosnia and Herzegovina": 13, "Bulgaria": 14, "Croatia": 14,
             "Cyprus": 12, "Czechia": 17, "Denmark": 16, "Estonia": 13,
@@ -125,6 +134,7 @@ class Map:
             "United Republic of Tanzania": 14, "Togo": 11, "Tunisia": 15, "Uganda": 14,
             "Zambia": 13, "Zimbabwe": 12}}
 
+        #starting units assigned - half as infantry, 1/6 as artillery and 1/3 as tank
         for territory in self.territories.values():
             units = starting_units[self.map].get(territory.name, 10)
             infantry_units = units // 2
@@ -135,20 +145,35 @@ class Map:
             territory.units["artillery"] = artillery_units
 
 
+#Displays the map and translates coordinates to screen positions
 class MapDisplay:
     def __init__(self, map, screen):
-        self.map = map
+        self.map = map  
         self.screen = screen
-        self.camera = Camera(self.get_camera_pos())
+        self.camera = Camera(self.get_camera_pos(),self.get_camera_bounds(), self.screen)
 
+    # Select initial camera offset for the continent - represents starting coordinates of top left of screen 
     def get_camera_pos(self):
-        if self.map.file == "europe_coords.json":
-            return [3500, 500]
-        elif self.map.file == "asia_coords.json":
-            return [2400, 240]
-        elif self.map.file == "africa_coords.json":
-            return [1700, 500]
+        if self.map.file == "europe_coordinates.json":
+            return [3400, 400]
+        elif self.map.file == "asia_coordinates.json":
+            return [2200, 240]
+        elif self.map.file == "africa_coordinates.json":
+            return [1550, 500]
 
+    #Calculate camera limits using territory bounds
+    def get_camera_bounds(self):
+        bounds = []
+        for territory in self.map.territories.values():
+            bounds.append(territory.shape.bounds)
+        padding = 1000
+        left = min(bound[0] for bound in bounds) - padding
+        top = min(bound[1] for bound in bounds) - padding
+        right = max(bound[2] for bound in bounds) + padding
+        bottom = max(bound[3] for bound in bounds) + padding
+        return left, top, right, bottom
+    
+    #Converts mouse position on screen to a map coordinate - detect hovering and clicking a territory 
     def get_map_pos(self):
         mouse_pos = pygame.mouse.get_pos()
         x = (mouse_pos[0] / self.camera.zoom) + self.camera.pos[0]
@@ -159,7 +184,7 @@ class MapDisplay:
         self.camera.update(events)
 
     def draw(self, player, ai_players):
-        position = Point(self.get_map_pos())
+        position = Point(self.get_map_pos())    #create a shapely point for polygon checks
         for territory in self.map.territories.values():
             territory.check_hovered(position)
             territory.draw(self.screen, self.camera.pos, self.camera.zoom, player, ai_players)

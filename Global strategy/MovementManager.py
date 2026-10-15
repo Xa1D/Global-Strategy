@@ -1,5 +1,3 @@
-import pygame
-
 class MovementManager:
     def __init__(self, player, ui):
         self.player = player
@@ -27,15 +25,20 @@ class MovementManager:
         return state
     
     def handle_move(self, clicked_territory):
-        if self.move_from and self.move_to is None:
-            if clicked_territory in self.player.territories:
-                if clicked_territory.name in self.move_from.adjacent:
-                    if clicked_territory.combat:
-                        self.ui.show_message("Territory is in combat")
-                        return
-                    self.move_to = clicked_territory
-                    self.ui.remove_highlight(self.map)
-                    self.refresh_panel()
+        if  not self.move_from or self.move_to:
+            return
+        if clicked_territory not in self.player.territories:
+            self.ui.show_message("Territory is not owned")
+            return
+        if clicked_territory.name not in self.move_from.adjacent:
+            self.ui.show_message("Territory is not adjacent")
+            return
+        if clicked_territory.combat:
+            self.ui.show_message("Territory is in combat")
+            return
+        self.move_to = clicked_territory
+        self.ui.remove_highlight(self.map)
+        self.refresh_panel()
 
     def refresh_panel(self):
         self.ui.open_move_panel(self.move_from, self.count, self.adjust, self.confirm_move, self.finish_move)
@@ -48,10 +51,11 @@ class MovementManager:
 
     def confirm_move(self):
         if sum(self.count.values()) <= 0:
+            self.ui.show_message("Cannot move 0 units")
             return
         success = self.player.move_units(self.move_from, self.move_to, self.count["infantry"], self.count["tank"], self.count["artillery"])
         if success:
-            self.player.last_action = "reinforcing"
+            self.player.record_action("reinforcing")
             self.ui.show_message(f"Moved {self.count['infantry']} infantry, {self.count['tank']} tanks, {self.count['artillery']} artillery to {self.move_to.name}")
         self.finish_move()
 

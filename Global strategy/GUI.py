@@ -29,9 +29,9 @@ class Button():
 
     def update(self, screen):
         mouse_pos = pygame.mouse.get_pos()
+        self.change_hover_colour(mouse_pos)
         screen.blit(self.surface, self.rect)
         screen.blit(self.text, self.text_rect)
-        self.change_hover_colour(mouse_pos)
 
     def change_hover_colour(self, pos):
         if self.rect.collidepoint(pos):
@@ -44,9 +44,13 @@ class Button():
                 self.surface.fill(self.base_bg)
 
     def handle_event(self, event):
-        if event.type == pygame.MOUSEBUTTONDOWN and self.rect.collidepoint(event.pos):
-            if self.function:
-                self.function()
+        if event.type != pygame.MOUSEBUTTONDOWN:
+            return False
+        if not self.rect.collidepoint(event.pos):
+            return False
+        if event.button == 1 and self.function:
+            self.function()
+        return True
 
 class Panel:
     def __init__(self, pos, width, height, font):
@@ -71,8 +75,15 @@ class Panel:
         self.dividers.append((x_start, y_start, x_end,y_end))
 
     def handle_event(self, event):
-        for i in self.buttons:
-            i.handle_event(event)
+        if event.type != pygame.MOUSEBUTTONDOWN:
+            return False
+        panel_rect = pygame.Rect(self.pos[0], self.pos[1],self.width, self.height)
+        if not panel_rect.collidepoint(event.pos):
+            return False
+        for button in self.buttons:
+            if button.handle_event(event):
+                break
+        return True
 
     def draw_labels(self, screen):
         for text, position in self.labels:
@@ -91,25 +102,36 @@ class Panel:
             button.update(screen)
 
 class Camera:
-    def __init__(self,pos):
+    def __init__(self,pos, bounds, screen):
         self.speed = 8
-        self.pos = [pos[0],pos[1]]
-        self.zoom = 1
-        self.zoom_range = [0.5,2]
+        self.pos = [pos[0], pos[1]]  #represents top left of screen
+        self.zoom = 0.8
+        self.zoom_range = [0.5, 2]
         self.zoom_speed = 0.05
+        self.bounds = bounds
+        self.screen = screen
 
     def handle_scroll(self,events):
         for event in events:
             if event.type == pygame.MOUSEWHEEL:
                 original_zoom = self.zoom
-                if event.y > 0:
+                if event.y > 0:  #zooming in
                     self.zoom = min(self.zoom + self.zoom_speed, self.zoom_range[1])
-                if event.y < 0:
+                if event.y < 0: #zooming out
                     self.zoom = max(self.zoom - self.zoom_speed, self.zoom_range[0])
-
                 mouse_x, mouse_y = pygame.mouse.get_pos()
-                self.pos[0] = self.pos[0] + mouse_x / original_zoom - mouse_x / self.zoom
+                self.pos[0] = self.pos[0] + mouse_x / original_zoom - mouse_x / self.zoom  
                 self.pos[1] = self.pos[1] + mouse_y / original_zoom - mouse_y / self.zoom
+                #centers zoom at mouse / cursor position by adding the difference of mouse map coordinates before and after zoom
+
+    def limit(self):
+        left, top, right, bottom = self.bounds
+        map_width = self.screen.get_width() / self.zoom #convert window size from screen to map coordinates
+        map_height = self.screen.get_height() / self.zoom
+        max_x = right - map_width  #calculates max x/y coordinates since camera's pos represents top left
+        max_y = bottom - map_height
+        self.pos[0] = max(left, min(self.pos[0], max_x))
+        self.pos[1] = max(top, min(self.pos[1], max_y))
                    
     def update(self,events):
         keys = pygame.key.get_pressed()
@@ -122,3 +144,4 @@ class Camera:
         if keys[pygame.K_s]:
             self.pos[1] += self.speed
         self.handle_scroll(events)
+        self.limit()

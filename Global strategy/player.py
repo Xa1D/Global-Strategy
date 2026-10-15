@@ -12,17 +12,22 @@ class Player:
         self.start_time = pygame.time.get_ticks()
         self.last_income_time = pygame.time.get_ticks()
         self.last_action = "idle"
+        self.action_history = []
         self.attacks_made = 0
         self.attacks_won = 0
         self.attacks_lost = 0
-        self.units_lost = 0          # units lost while attacking
+        self.units_lost = 0            # units lost while attacking
         self.units_lost_defending = 0  # units lost while being attacked
-        self.times_defended = 0        # attacks survived (defender won)
-        self.times_conquered = 0       # territories lost to an attack (defender lost)
+        self.times_defended = 0        # attacks survived as defender
+        self.times_conquered = 0       # territories lost to an attack 
         self.currency_earned = 0
         self.currency_spent = 0
         self.peak_territories = 1
         self.territories_at_2min = None
+
+    def record_action(self, action):
+        self.last_action = action
+        self.action_history.append(action)
 
     def apply_attack_result(self, result, attacker_units_before, defender_units_before, defender_owner):
         cooldown_time = 9000
@@ -72,13 +77,17 @@ class Player:
             self.last_income_time = current_time
 
 #moves the amount of units from original to selected territory
-#if amount is too great then 1 - territory units is moved from min function
     def move_units(self, original_territory, selected_territory, infantry_amount, tank_amount, artillery_amount):
         if original_territory not in self.territories or selected_territory not in self.territories:
             return False
         if selected_territory.name not in original_territory.adjacent:
             return False
         if infantry_amount + tank_amount + artillery_amount <= 0:
+            return False
+        if original_territory.combat or selected_territory.combat:
+            return False
+        amounts = {"infantry": infantry_amount,"tank": tank_amount,"artillery": artillery_amount}
+        if any(amount > original_territory.units.get(unit_type, 0) for unit_type, amount in amounts.items()):
             return False
         original_territory.units["infantry"] -= infantry_amount
         selected_territory.units["infantry"] += infantry_amount

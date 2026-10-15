@@ -15,13 +15,13 @@ class PurchaseManager:
 
     def refresh_panel(self, selected_territory):
         self.selected_territory = selected_territory
-        self.ui.open_buy_panel(self.purchase_amounts, self.adjust,self.buy_infantry, self.buy_tank, self.buy_artillery)
+        self.ui.open_purchase_panel(self.purchase_amounts, self.adjust,self.buy_infantry, self.buy_tank, self.buy_artillery)
 
     def adjust(self, unit_type, unit_change):
         cost = STATS[unit_type]["cost"]
-        max_affordable = max(self.player.currency // cost, 1)
+        max_units = max(self.player.currency // cost, 1)
         new_value = self.purchase_amounts[unit_type] + unit_change
-        new_value = max(1, min(new_value, max_affordable))
+        new_value = max(1, min(new_value, max_units))
         self.purchase_amounts[unit_type] = new_value
         self.refresh_panel(self.selected_territory)
 
@@ -32,6 +32,9 @@ class PurchaseManager:
         cost = STATS[unit_type]["cost"] * amount
         if self.player.currency < cost:
             self.ui.show_message("Cannot afford units")
+            return
+        if self.selected_territory.combat:
+            self.ui.show_message("Territory is currently in combat")
             return
         self.player.buy_units(self.selected_territory, unit_type, amount)
         self.refresh_panel(self.selected_territory)

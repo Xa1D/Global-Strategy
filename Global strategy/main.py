@@ -2,8 +2,8 @@ import pygame
 import sys
 from game import Game
 from MenuUI import MenuUI
-pygame.init()
 
+pygame.init()
 screen = pygame.display.set_mode((1280, 720))
 clock = pygame.time.Clock()
 
@@ -33,7 +33,7 @@ def main():
             elif state == "ai_selection":
                 count = menu_ui.select_ai_count(event)
                 if count:
-                    filename = {"Europe": "europe_coords.json", "Asia": "asia_coords.json", "Africa": "africa_coords.json"}[pending_map]
+                    filename = {"Europe": "europe_coordinates.json", "Asia": "asia_coordinates.json", "Africa": "africa_coordinates.json"}[pending_map]
                     game = Game(screen, filename, clock, ai_count=count)
                     state = "game"
             elif state == "game":   

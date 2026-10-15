@@ -4,11 +4,11 @@ import pygame
 class GameUI:
     def __init__(self):
         self.clock = pygame.time.Clock()
-        self.text_font = pygame.font.SysFont("Roboto", 29)
+        self.text_font = pygame.font.SysFont("segoeui", 22)
         self.result_font = pygame.font.SysFont("Roboto",33)
         self.background_font = pygame.font.SysFont("Roboto", 20)
 
-        self.sidebar = Panel(pos=(1000, 0), width=280, height=720, font=self.text_font)
+        self.sidebar = Panel(pos=(980, 50), width=260, height=590, font=self.text_font)
         self.sidebar_visible = False
 
         self.panel = Panel(pos=(320,50), width=650, height=590, font=self.text_font)
@@ -17,7 +17,7 @@ class GameUI:
         self.background_panel = Panel(pos=(350,50), width=650, height=620, font=self.background_font)
         self.background_panel_visible = False
 
-        self.player_sidebar = Panel(pos=(0,40), width=280, height=570, font=self.text_font)
+        self.player_sidebar = Panel(pos=(20,50), width=250, height=540, font=self.text_font)
         self.player_sidebar_visible = False
 
         self.setup_mode = "player"
@@ -44,19 +44,31 @@ class GameUI:
         self.clear_panel(self.player_sidebar)
         self.clear_panel(self.background_panel)
 
+    def draw_elapsed_time(self, screen, elapsed_ms):
+        total_seconds = elapsed_ms // 1000
+        minutes = total_seconds // 60
+        seconds = total_seconds % 60
+        time_text = self.text_font.render(f"Time: {minutes:02d}:{seconds:02d}",True,(255, 255, 255))
+        screen.blit(time_text, (1140, 10))
+
     def remove_highlight(self,map):
         for territory in map.territories.values():
             territory.highlighted = False
 
     def highlight_attack(self,selected_territory,map,player):
+        self.remove_highlight(map)
+        current_time = pygame.time.get_ticks()
         for name in selected_territory.adjacent:
-            if map.territories[name] not in player.territories and not map.territories[name].combat:
-                map.territories[name].highlighted = True
+            territory = map.territories[name]
+            if territory not in player.territories and not territory.combat and territory.attack_cooldown <= current_time:
+                territory.highlighted = True
 
     def highlight_move(self,selected_territory,map,player):
+        self.remove_highlight(map)
         for name in selected_territory.adjacent:
-            if map.territories[name] in player.territories and not map.territories[name].combat:
-                map.territories[name].highlighted = True
+            territory = map.territories[name]
+            if territory in player.territories and not territory.combat:
+                territory.highlighted = True
 
     def show_message(self,text):
         self.message_text = text
@@ -89,30 +101,32 @@ class GameUI:
 
     def update_sidebar(self,selected_territory,player,buy_units,enter_attack,enter_move):
         self.clear_panel(self.sidebar)
+        self.sidebar.add_divider(990,100,1220,100)
         if selected_territory:
-            self.sidebar.add_text(f"{selected_territory.name}",(1020,10))
-            self.sidebar.add_text(f"Infantry: {selected_territory.units['infantry']}", (1020, 45))
-            self.sidebar.add_text(f"Tanks: {selected_territory.units['tank']}", (1020, 85))
-            self.sidebar.add_text(f"Artillery: {selected_territory.units['artillery']}", (1020, 125))
+            self.sidebar.add_text(f"{selected_territory.name}",(990,65))
+            self.sidebar.add_text(f"Infantry           {selected_territory.units['infantry']}", (990, 120))
+            self.sidebar.add_text(f"Tanks              {selected_territory.units['tank']}", (990, 160))
+            self.sidebar.add_text(f"Artillery          {selected_territory.units['artillery']}", (990, 190))
         if selected_territory and selected_territory in player.territories:
-            self.sidebar.add_button("Buy Units",(1120,210), buy_units)
-            self.sidebar.add_button("Attack", (1120, 270), enter_attack)
-            self.sidebar.add_button("Move Units", (1120, 330), enter_move)
+            self.sidebar.add_divider(990,235,1220,235)
+            self.sidebar.add_button("Buy Units",(1070,285), buy_units)
+            self.sidebar.add_button("Attack", (1070, 355), enter_attack)
+            self.sidebar.add_button("Move Units", (1070, 420), enter_move)
 
-    def update_player_sidebar(self,player,ai_players):
+    def update_player_sidebar(self,player, ai_players, map_display):
         if player is None:
             return
         self.clear_panel(self.player_sidebar)
-        self.player_sidebar.add_text("Player Stats", (20, 50))
-        self.player_sidebar.add_text(f"Territories: {len(player.territories)}", (20, 90))
-        self.player_sidebar.add_text(f"Total infantry: {sum(c.units['infantry'] for c in player.territories)}", (20, 120))
-        self.player_sidebar.add_text(f"Total tanks: {sum(c.units['tank'] for c in player.territories)}", (20, 150))
-        self.player_sidebar.add_text(f"Total artillery: {sum(c.units['artillery'] for c in player.territories)}", (20, 180))
+        self.player_sidebar.add_text("Player Stats", (30, 60))
+        self.player_sidebar.add_text(f"Territories: {len(player.territories)} / {len(map_display.map.territories)}", (30, 90))
+        self.player_sidebar.add_text(f"Total infantry: {sum(territory.units['infantry'] for territory in player.territories)}", (30, 120))
+        self.player_sidebar.add_text(f"Total tanks: {sum(territory.units['tank'] for territory in player.territories)}", (30, 150))
+        self.player_sidebar.add_text(f"Total artillery: {sum(territory.units['artillery'] for territory in player.territories)}", (30, 180))
         y = 210
         count = 1
         for ai in ai_players:
-            self.player_sidebar.add_text(f"AI {count} territories: {len(ai.territories)}", (20, y))
-            self.player_sidebar.add_text(f"AI {count} currency: {ai.currency}", (20, y + 30))
+            self.player_sidebar.add_text(f"AI {count} territories: {len(ai.territories)} / {len(map_display.map.territories)}", (30, y))
+            self.player_sidebar.add_text(f"AI {count} currency: {ai.currency}", (30, y + 30))
             count += 1
             y += 60
 
@@ -162,13 +176,13 @@ class GameUI:
         self.player_sidebar_visible = not self.player_sidebar_visible
 
     def handle_panel_event(self,event):
-        self.panel.handle_event(event)
+        return self.panel.handle_event(event)
 
     def handle_sidebar_event(self,event):
-        self.sidebar.handle_event(event)
+        return self.sidebar.handle_event(event)
 
     def handle_player_sidebar_event(self,event):
-        self.player_sidebar.handle_event(event)
+        return self.player_sidebar.handle_event(event)
 
     def open_move_panel(self, move_from, count, adjust, confirm, cancel):
         self.clear_panel(self.panel)
@@ -191,7 +205,7 @@ class GameUI:
 
         self.open_panel()
 
-    def open_buy_panel(self, amounts, adjust, buy_infantry, buy_tank, buy_artillery):
+    def open_purchase_panel(self, amounts, adjust, buy_infantry, buy_tank, buy_artillery):
         self.clear_panel(self.panel)
         self.panel.add_text("Select amount and type of unit to buy:", (370, 60))
 
@@ -242,8 +256,8 @@ class GameUI:
     def draw_player_stats(self,player,screen):
         currency_text = self.text_font.render(f"Currency: {player.currency}", True, (255, 255, 255))
         income_text = self.text_font.render(f"Income: {player.income}", True, (255, 255, 255))
-        screen.blit(currency_text, (250, 10))
-        screen.blit(income_text, (500, 10))
+        screen.blit(currency_text, (230, 10))
+        screen.blit(income_text, (450, 10))
 
     def draw_fps(self,screen,clock):
         fps_text = self.text_font.render(f"FPS: {int(clock.get_fps())}", True, (255, 255, 255))
@@ -255,25 +269,21 @@ class GameUI:
         left_x = 350
         right_x = 700
         self.panel.add_divider(right_x-40,self.panel.pos[1]+60,right_x-40,self.panel.pos[1] + 480)
-
         if not combat_log:
-            self.panel.add_text("Territory was undefended - captured instantly", (left_x-20, 160))
+            self.panel.add_text("Territory was undefended", (left_x-20, 160))
+            self.panel.add_text("Captured instantly",(left_x-20, 180 ))
             y = 220
         else:
-            round_data = combat_log[round_num - 1]
-            phase = round_data["phases"][0]
-            start_attacker = phase["attacker_before"]
-            start_defender = phase["defender_before"]
-            end_attacker = phase["attacker_after"]
-            end_defender = phase["defender_after"]
-
+            stats = combat_log[round_num - 1]
+            start_attacker = stats["attacker_before"]
+            start_defender = stats["defender_before"]
+            end_attacker = stats["attacker_after"]
+            end_defender = stats["defender_after"]
             left_x = 350
             right_x = 700
-
             self.panel.add_divider(right_x-40,self.panel.pos[1]+60,right_x-40,self.panel.pos[1] + 480)
             self.panel.add_text("Combat", (580, 60))
             self.panel.add_text(f"Round {round_num} / {max_rounds}", (560, 80))
-
             self.panel.add_text("Player", (left_x, 120))
             self.panel.add_text("Enemy", (right_x, 120))
 
@@ -287,99 +297,75 @@ class GameUI:
 
             left_y = 230
             right_y = 230
-
             self.panel.add_text("Attacks", (left_x, left_y))
             self.panel.add_text("Attacks", (right_x, right_y))
-
             left_y += 30
             right_y += 30
 
-            attacker_types = phase["attacker_unit_type"]
-
+            attacker_types = stats["attacker_unit_type"]
             if not attacker_types:
-                self.panel.add_text("no attacks this round", (left_x, left_y))
+                self.panel.add_text("No attacks this round", (left_x, left_y))
                 left_y += 25
-
             for unit_type in attacker_types:
-                breakdown = phase["attacker_breakdowns"].get(unit_type, {})
+                breakdown = stats["attacker_breakdowns"].get(unit_type, {})
                 damage = sum(breakdown.values()) if breakdown else 0
                 self.panel.add_text(f"{unit_type.capitalize()}: {damage:.1f} dmg", (left_x, left_y))
                 left_y += 25
-
                 for target_type, target_damage in breakdown.items():
                     self.panel.add_text(f"  -> {target_type.capitalize()}: {target_damage:.1f}", (left_x + 15, left_y))
                     left_y += 25
 
-            defender_types = phase["defender_unit_type"]
-
+            defender_types = stats["defender_unit_type"]
             if not defender_types:
-                self.panel.add_text("(none this round)", (right_x, right_y))
+                self.panel.add_text("No attacks this round", (right_x, right_y))
                 right_y += 25
-
             for unit_type in defender_types:
-                breakdown = phase["defender_breakdowns"].get(unit_type, {})
+                breakdown = stats["defender_breakdowns"].get(unit_type, {})
                 damage = sum(breakdown.values()) if breakdown else 0
                 self.panel.add_text(f"{unit_type.capitalize()}: {damage:.1f} dmg", (right_x, right_y))
                 right_y += 25
-
                 for target_type, target_damage in breakdown.items():
                     self.panel.add_text(f"  -> {target_type.capitalize()}: {target_damage:.1f}", (right_x + 15, right_y))
                     right_y += 25
 
             y = max(left_y,right_y) + 25
-
             self.panel.add_text(f"Infantry {end_attacker['infantry']} / Tank {end_attacker['tank']} / Artillery {end_attacker['artillery']}", (left_x-10, y))
             self.panel.add_text(f"Infantry {end_defender['infantry']} / Tank {end_defender['tank']} / Artillery {end_defender['artillery']}", (right_x-10, y))
-
             y += 40
 
         self.panel.add_divider(right_x-40,self.panel.pos[1]+60,right_x-40,y)
-
         if is_last_round and result_text:
             self.panel.add_text(f"Result: {result_text}", (700, y+40))
-
         if is_last_round:
             continue_label = "FINISH" if can_finish else "FINISH (disabled)"
             continue_action = continue_round if can_finish else None
         else:
             continue_label = "CONTINUE"
             continue_action = continue_round
-
         self.panel.add_button(continue_label,(420, y + 50),continue_action)
-
         if not is_last_round:
             skip_label = "SKIP" if can_skip else "SKIP (disabled)"
             self.panel.add_button(skip_label, (570, y+50), skip if can_skip else None)
-
         self.open_panel()
 
     def draw(self,screen,map_display,state,player,ai_players,game_result):
         screen.fill((0, 0, 0))
-
         if state == "setup":
             self.draw_setup(screen, map_display)
             self.draw_message(screen)
             self.update_message()
             return
-
         map_display.draw(player,ai_players)
-
         if self.panel_visible:
             self.panel.draw(screen)
-
         if self.background_panel_visible:
             self.background_panel.draw(screen)
-
         if self.sidebar_visible:
             self.sidebar.draw(screen)
-
         if player:
             self.draw_player_stats(player, screen)
-
         if self.player_sidebar_visible:
             self.player_sidebar.draw(screen)
-
         if state == "game_over":
             self.open_background_panel(game_result,player,ai_players)
-
         self.draw_message(screen)

@@ -13,15 +13,15 @@ class Combat:
         self.artillery_priority = ["tank", "infantry","artillery"]
         self.infantry_priority = ["artillery", "infantry","tank"]
         self.tank_priority = ["infantry","tank","artillery"]
-        self.combat_log = []
-        self.attacker_hp = self.get_hp_counts(self.attacker)
-        self.defender_hp = self.get_hp_counts(self.defender)
+        self.combat_log = []   #storing data for each round 
+        self.attacker_hp = self.get_hp(self.attacker) #initialising attacker and defender hp 
+        self.defender_hp = self.get_hp(self.defender)
 
-    def get_hp_counts(self, player):
+    def get_hp(self, player):
         hp_counts = {}
         for unit_type, stats in STATS.items():
             count = player.units.get(unit_type, 0)
-            hp_counts[unit_type] = [stats["health"]] * count
+            hp_counts[unit_type] = [stats["health"]] * count    #creating a dictionary containing list of individual unit health values for each unit type
         return hp_counts
 
     def units_left(self,player):
@@ -41,11 +41,10 @@ class Combat:
             defender_hp_before = sum(sum(hp) for hp in self.defender_hp.values())
             round_data = self.simulate_round(round_number)
             self.combat_log.append(round_data)
-            for phase in round_data["phases"]:
-                if not self.units_left(self.attacker) and not self.units_left(self.defender):
-                    attacker_extra_damage = phase["attacker_damage_dealt"] - defender_hp_before
-                    defender_extra_damage = phase["defender_damage_dealt"] - attacker_hp_before
-                    return "attacker" if attacker_extra_damage >= defender_extra_damage else "defender"
+            if not self.units_left(self.attacker) and not self.units_left(self.defender):
+                attacker_extra_damage = round_data["attacker_damage_dealt"] - defender_hp_before
+                defender_extra_damage = round_data["defender_damage_dealt"] - attacker_hp_before
+                return "attacker" if attacker_extra_damage >= defender_extra_damage else "defender"
             round_number += 1
         if self.units_left(self.attacker) and not self.units_left(self.defender):
             return "attacker"
@@ -63,7 +62,7 @@ class Combat:
         return damage
 
     def simulate_damage(self, defender, damage, priority, defender_hp):
-        damage_list = {}
+        damage_list = {}   #stores damage list recording total damage done per unit type
         for unit_type in priority:
             if damage <= 0:
                 break
@@ -90,23 +89,21 @@ class Combat:
             return self.tank_priority
 
     def simulate_round(self, round_number):
-        attacker_before = self.get_unit_counts(self.attacker)
+        attacker_before = self.get_unit_counts(self.attacker) #record initial attacker and defender unit counts
         defender_before = self.get_unit_counts(self.defender)
-        attacker_types = [unit_type for unit_type in STATS if self.attacker.units.get(unit_type, 0) > 0 and (round_number - 1) % STATS[unit_type]["cooldown"] == 0]
+        attacker_types = [unit_type for unit_type in STATS if self.attacker.units.get(unit_type, 0) > 0 and (round_number - 1) % STATS[unit_type]["cooldown"] == 0] #recording eligible unit types for round
         defender_types = [unit_type for unit_type in STATS if self.defender.units.get(unit_type, 0) > 0 and (round_number - 1) % STATS[unit_type]["cooldown"] == 0]
-        attacker_attacks = {unit_type: self.get_damage(unit_type,self.attacker.units[unit_type]) for unit_type in attacker_types}
-        defender_attacks = {unit_type: self.get_damage(unit_type,self.defender.units[unit_type])for unit_type in defender_types}
-        attacker_damage = sum(attacker_attacks.values())
+        attacker_attacks = {unit_type: self.get_damage(unit_type,self.attacker.units[unit_type]) for unit_type in attacker_types}  #recording damage per unit type per player
+        defender_attacks = {unit_type: self.get_damage(unit_type, self.defender.units[unit_type]) for unit_type in defender_types}
+        attacker_damage = sum(attacker_attacks.values()) #recording total damage to be used for excess damage calculation
         defender_damage = sum(defender_attacks.values())
         attacker_damage_list = {}
         defender_damage_list = {}
         for unit_type, damage in attacker_attacks.items():
-            attacker_damage_list[unit_type] = self.simulate_damage(self.defender,damage,self.get_priority(unit_type),self.defender_hp)
+            attacker_damage_list[unit_type] = self.simulate_damage(self.defender,damage,self.get_priority(unit_type),self.defender_hp) #recording damage per unit type per enemies unit type
         for unit_type, damage in defender_attacks.items():
             defender_damage_list[unit_type] = self.simulate_damage(self.attacker,damage,self.get_priority(unit_type),self.attacker_hp)
-        return {
-            "phases": [{
-                "attacker_unit_type": attacker_types,
+        return {"attacker_unit_type": attacker_types,
                 "defender_unit_type": defender_types,
 
                 "attacker_damage_dealt": attacker_damage,
@@ -119,5 +116,5 @@ class Combat:
                 "defender_before": defender_before,
 
                 "attacker_after": self.get_unit_counts(self.attacker),
-                "defender_after": self.get_unit_counts(self.defender)}]
-            }
+                "defender_after": self.get_unit_counts(self.defender)}
+        #returning stats per round to be used by UI and combat simulation

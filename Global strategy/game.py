@@ -4,7 +4,6 @@ from shapely.geometry import Point
 from player import Player
 from ai import AI
 from GameUI import GameUI
-from combat import STATS
 from CombatManager import CombatManager
 from MovementManager import MovementManager
 from PurchaseManager import PurchaseManager
@@ -38,9 +37,27 @@ class Game:
         self.game_result = None
         self.game_state = "setup"
 
+    def start_match(self):
+        current_time = pygame.time.get_ticks()
+        self.player.start_time = current_time
+        self.player.last_income_time = current_time
+        offset = 4000
+        for ai in self.ai_players:
+            ai.start_time = current_time
+            ai.last_income_time = current_time
+            ai.next_action = current_time + offset
+            offset += 2500
+        self.game_state = "play"
+
+    #Update game timers correctly after pausing and resuming
     def shift_timers(self, paused_duration):
         self.player.start_time += paused_duration
         self.player.last_income_time += paused_duration
+        for territory in self.map.territories.values():
+            if territory.attack_cooldown > self.start_pause:
+                territory.attack_cooldown += paused_duration
+        if self.combat_manager is not None and self.combat_manager.incoming_attack is not None:
+            self.combat_manager.combat_start_time += paused_duration
         for ai in self.ai_players:
             ai.start_time += paused_duration
             ai.last_income_time += paused_duration
@@ -73,10 +90,10 @@ class Game:
         if event.type != pygame.MOUSEBUTTONDOWN:
             return
         for territory in self.map.territories.values():
-            if territory.polygon.contains(point):
-                if self.ui.get_setup_mode() == "player":
+            if territory.shape.contains(point):
+                if self.ui.get_setup_mode() == "player":  #initialising player and manager classes
                     self.player_territory = territory
-                    self.player = Player(territory)
+                    self.player = Player(territory)              
                     self.combat_manager = CombatManager(self.player,self.ui)
                     self.movement_manager = MovementManager(self.player,self.ui)
                     self.purchase_manager = PurchaseManager(self.player,self.ui)
@@ -86,16 +103,16 @@ class Game:
                     taken = [self.player_territory] + [ai.territory for ai in self.ai_players]
                     if territory not in taken:
                         playstyles = ["aggressive", "defensive","balanced"]
-                        playstyle = playstyles[len(self.ai_players) % len(playstyles)]
-                        offset = 5000 + len(self.ai_players) * 2500
-                        ai = AI(territory, playstyle=playstyle,offset=offset)
+                        playstyle = playstyles[len(self.ai_players) % len(playstyles)]   #playstyles assigned based on AI order
+                        ai = AI(territory, playstyle=playstyle)
                         self.ai_players.append(ai)
                         self.ui.place_enemy()
                         if self.ui.all_enemies_placed():
-                            self.game_state = "play"
+                            self.start_match()
                         return
                     else:
                         self.ui.show_message("Territory already selected")
+
 #handles player clicking territories on map  
     def handle_territory_click(self, clicked_territory):
         if self.selected_territory == clicked_territory:
@@ -133,20 +150,24 @@ class Game:
                 if self.ui.is_panel_visible():
                     self.ui.handle_panel_event(event)
                 return
-            if self.ui.is_panel_visible():
-                self.ui.handle_panel_event(event)
-            if self.ui.is_sidebar_visible():
-                self.ui.handle_sidebar_event(event)
             if self.ui.is_player_sidebar_visible():
-                self.ui.handle_player_sidebar_event(event)
+                if self.ui.handle_player_sidebar_event(event):
+                    return
+            if self.ui.is_sidebar_visible():
+                if self.ui.handle_sidebar_event(event):
+                    return
+            if self.ui.is_panel_visible():
+                if self.ui.handle_panel_event(event):
+                    return
             if event.type == pygame.MOUSEBUTTONDOWN:
                 self.clicked_territory = None
                 for territory in self.map.territories.values():
-                   if territory.polygon.contains(point):
+                   if territory.shape.contains(point):
                       self.clicked_territory = territory
                       self.handle_territory_click(self.clicked_territory)
 
     def select_territory(self, clicked_territory):
+        self.ui.close_panel()
         self.selected_territory = clicked_territory 
         self.ui.remove_highlight(self.map)
         self.ui.update_sidebar(self.selected_territory, self.player, self.open_purchase_panel, self.enter_attack, self.enter_move)
@@ -169,7 +190,7 @@ class Game:
         self.ui.update_message()
         if self.game_state != "game_over":
             self.map_display.update(events)
-            self.ui.update_player_sidebar(self.player,self.ai_players)
+            self.ui.update_player_sidebar(self.player,self.ai_players,self.map_display)
             self.game_state = self.combat_manager.update(self.game_state)
             self.game_state = self.movement_manager.update(self.game_state)
             elapsed = pygame.time.get_ticks() - self.player.start_time
@@ -178,11 +199,12 @@ class Game:
                 for ai in self.ai_players:
                     ai.territories_at_2min = len(ai.territories)
             for ai in self.ai_players:
-                ai.update_ai(self.map, self.player,self.ai_players)
-                ai.update()
+                ai.update(self.map, self.player,self.ai_players)
             if self.player:
                 self.player.update()
             self.check_win()
+            if self.ui.is_sidebar_visible():
+                self.ui.update_sidebar(self.selected_territory,self.player, self.open_purchase_panel, self.enter_attack, self.enter_move)
 
     def draw(self):
         self.ui.draw(self.screen, self.map_display, self.game_state, self.player, self.ai_players, self.game_result)
@@ -193,3 +215,10 @@ class Game:
                 self.screen.blit(text, (10, 680 - current_display*30))
                 current_display += 1
         self.ui.draw_fps(self.screen, self.clock)
+        if self.player is not None and self.game_state != "setup":
+            if self.game_state == "game_over":
+                current_time = self.end_time
+            else:
+                current_time = pygame.time.get_ticks()
+            elapsed_ms = current_time - self.player.start_time
+            self.ui.draw_elapsed_time(self.screen, elapsed_ms)
