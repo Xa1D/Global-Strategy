@@ -4,33 +4,34 @@ from GUI import Camera
 from territory import Territory
 import json
 
+MAP_SETTINGS = {"europe_coordinates.json": ("Europe", 8000, 4000),
+                "asia_coordinates.json": ("Asia", 4000, 2000),
+                "africa_coordinates.json": ("Africa", 4000, 2000)}
+
 #loads selected map and constructs territory data to be used by the game
 class Map:
     def __init__(self, map_file):
         self.file = map_file
-        self.width, self.height, self.map = self.get_map_size()
+        self.map, self.width, self.height = self.get_map_size()
         self.territories = {}
         self.territory_data = self.get_map_data()
         self.create_map()   
 
     #Decides the map size which determines the coordinate scaling - Europe is smaller so greater map size means Europe will appear larger
     def get_map_size(self):
-        if self.file == "europe_coordinates.json":
-            width, height = 8000, 4000
-            map = "Europe"
-        elif self.file == "asia_coordinates.json":
-            width, height = 4000, 2000
-            map = "Asia"
-        elif self.file == "africa_coordinates.json":
-            width, height = 4000, 2000
-            map = "Africa"
-        return width, height, map
+        if self.file not in MAP_SETTINGS:
+            raise ValueError(f"Unknown map file: {self.file}")
+        name, width, height = MAP_SETTINGS[self.file]
+        return name, width, height
 
     #reads the selected JSON file and returns the dictionary containing territory data 
     def get_map_data(self):
-        with open(self.file,"r") as file:
-            territory_data = json.load(file)
-        return territory_data
+        try:
+            with open(self.file,"r") as file:
+                territory_data = json.load(file)
+                return territory_data
+        except Exception as error:
+            raise RuntimeError(f"Could not load map file {self.file} : {error}")
 
     def create_map(self):
         self.get_territories()

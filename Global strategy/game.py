@@ -132,6 +132,7 @@ class Game:
                 return
             if event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
                 return
+            
             point = Point(self.map_display.get_map_pos())
             if self.game_state == "setup":
                 self.handle_setup(event, point)
@@ -146,7 +147,7 @@ class Game:
                     self.ui.toggle_player_sidebar()
                 if event.key == pygame.K_ESCAPE:
                     return "pause"
-            if self.game_state == "attacking":
+            if self.game_state == "attacking": # prevents clicks outside panel during attack phase
                 if self.ui.is_panel_visible():
                     self.ui.handle_panel_event(event)
                 return

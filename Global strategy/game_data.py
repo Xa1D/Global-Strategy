@@ -1,11 +1,13 @@
 import geopandas
 import json
 
+SHAPEFILE_PATH = "./ne_50m_admin_0_countries/ne_50m_admin_0_countries.shp"
+
 class GameData:
-    def __init__(self,continent):
+    def __init__(self,continent, shapefile=SHAPEFILE_PATH):
         self.continent = continent
         #loads shapefile into a table with country information and shape type
-        self.data = geopandas.read_file("./ne_50m_admin_0_countries/ne_50m_admin_0_countries.shp")
+        self.data = geopandas.read_file(shapefile)
         self.remove = self.get_remove()
         self.territories = self.get_territories()
 
@@ -57,7 +59,6 @@ class GameData:
         with open(filename, "w") as file:
             json.dump(self.territories,file)  #create a JSON file with the corresponding filename and write the territories dictionary to it
 
-#Saving a file for each map available
-GameData("Europe").save()
-GameData("Asia").save()
-GameData("Africa").save()
+if __name__ == "__main__":
+    for continent in ("Europe", "Asia", "Africa"):
+        GameData(continent).save()  #Saving a file for each map available

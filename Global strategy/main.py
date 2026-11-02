@@ -34,8 +34,13 @@ def main():
                 count = menu_ui.select_ai_count(event)
                 if count:
                     filename = {"Europe": "europe_coordinates.json", "Asia": "asia_coordinates.json", "Africa": "africa_coordinates.json"}[pending_map]
-                    game = Game(screen, filename, clock, ai_count=count)
-                    state = "game"
+                    try:
+                        game = Game(screen, filename, clock, ai_count=count)
+                        state = "game"
+                    except (ValueError, RuntimeError) as error:
+                        print(f"Could not start game: {error}")
+                        game = None
+                        state = "menu"
             elif state == "game":   
                 result = game.handle_event(event)
                 if result == "pause":

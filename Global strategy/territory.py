@@ -59,7 +59,8 @@ class Territory:
             pygame.draw.polygon(screen,("white"), coordinates, width=1) #draws polygon outline
 
     def check_hovered(self, position):
-        if self.shape.contains(position):
-            self.hovered = True
-        else:
+        min_x, min_y, max_x, max_y = self.shape.bounds
+        if not(min_x <= position.x <= max_x and min_y <= position.y <= max_y):
             self.hovered = False
+            return
+        self.hovered = self.shape.contains(position)

@@ -2,6 +2,7 @@ from player import Player
 from ai_scoring import AIScoring
 import pygame
 from combat import Combat, VALUE_WEIGHTS
+from collections import deque
 
 class AI(Player):
     def __init__(self, territory, playstyle):
@@ -87,13 +88,14 @@ class AI(Player):
         return [territory for value, territory in targets[:count]]
 
     def search(self, start, target, map):
-        queue = [start]
+        queue = deque([start])
         visited = set([start])
         previous = {}
         path = []
         found = False
+
         while len(queue) > 0:
-            current = queue.pop(0)
+            current = queue.popleft()
             if current == target:
                 found = True
                 break
@@ -104,6 +106,7 @@ class AI(Player):
                         visited.add(neighbour)
                         previous[neighbour] = current
                         queue.append(neighbour)
+
         if not found:
             return
         current = target
@@ -320,8 +323,9 @@ class AI(Player):
     def execute_actions(self,map,enemies):
         self.purchase_units(map, enemies)
         state, weak_territory = self.evaluate_state(map,enemies)
-        path = self.get_target_path(map)
-        path_territories = {territory.name for territory in path} if path else set()
+        if state == "attacking" or state == "expanding":
+            path = self.get_target_path(map)
+            path_territories = {territory.name for territory in path} if path else set()
         action = "idle"
         if state == "attacking":
             pair, score = self.best_attack_target(map, enemies, path_territories)
