@@ -1,0 +1,30 @@
+
+Europe: adjacency is double-sided [4.2]
+Expected: True
+Observed: True
+PASS
+
+Europe: all territories are reachable [4.2]
+Expected: 38
+Observed: 38
+PASS
+
+Asia: adjacency is double-sided [4.2]
+Expected: True
+Observed: True
+PASS
+
+Asia: all territories are reachable [4.2]
+Expected: 41
+Observed: 41
+PASS
+
+Africa: adjacency is double-sided [4.2]
+Expected: True
+Observed: True
+PASS
+
+Africa: all territories are reachable [4.2]
+Expected: 49
+Observed: 49
+PASS
